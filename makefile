@@ -57,7 +57,7 @@ else
 	@rm -rf bin/ openapi-generator-cli-*.jar
 endif
 
-dist: clean admin client build
+dist: clean build
 ifeq ($(OS),Windows_NT)
 	CGO_ENABLED=1 GOOS=windows go build -o bin/watchman.exe github.com/moov-io/watchman/cmd/server
 else
