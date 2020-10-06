@@ -719,7 +719,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: 'https://raw.githubusercontent.com/moov-io/api/master/openapi-common.yaml#/components/schemas/Error'
+                $ref: 'https://raw.githubusercontent.com/moov-io/base/v0.27.0/api/common.yaml#/components/schemas/Error'
 
 components:
   schemas:
