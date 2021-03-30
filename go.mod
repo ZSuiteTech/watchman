@@ -8,6 +8,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20200107194136-26c1120b8d41 // indirect
 	github.com/go-kit/kit v0.9.0
 	github.com/go-sql-driver/mysql v1.5.0
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gorilla/mux v1.7.4
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/lopezator/migrator v0.2.0
@@ -19,7 +20,6 @@ require (
 	github.com/prometheus/client_golang v1.4.1
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	go4.org v0.0.0-20200104003542-c7e774b10ea0
-	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/text v0.3.3
 	gotest.tools v2.2.0+incompatible // indirect
