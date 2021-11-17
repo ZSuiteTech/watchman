@@ -1,0 +1,45 @@
+name: Windows Release (no tag)
+
+on: workflow_dispatch
+
+jobs:
+  testing:
+    name: Testing
+    runs-on: windows-latest
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.16
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Check
+      run: make check
+
+  publish:
+    name: Publish
+    needs: [testing]
+    runs-on: windows-latest
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.16
+      id: go
+
+    - name: Setup Node / NPM
+      uses: actions/setup-node@v2-beta
+      with:
+        node-version: '14'
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Get env
+      run: gci 'env:'
+
+    - name: Distribute
+      run: make dist

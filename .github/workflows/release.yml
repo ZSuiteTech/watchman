@@ -1,8 +1,6 @@
 name: Create Release
 
-on:
-  push:
-    tags: [ "v*.*.*" ]
+on: workflow_dispatch
 
 jobs:
   testing:
