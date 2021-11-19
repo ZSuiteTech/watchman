@@ -27,7 +27,8 @@ build-webhook-example:
 .PHONY: check
 check:
 ifeq ($(OS),Windows_NT)
-	sh -c 'TRAVIS_OS_NAME=windows MISSPELL_IGNORE="palestiniens,palestinians" ./lint-project.sh'
+	@choco install --confirm wget
+	TRAVIS_OS_NAME=windows MISSPELL_IGNORE="palestiniens,palestinians" ./lint-project.sh
 else
 	@wget -O lint-project.sh https://raw.githubusercontent.com/moov-io/infra/master/go/lint-project.sh
 	@chmod +x ./lint-project.sh
