@@ -18,35 +18,34 @@ fi
 echo "running go linters for $OS_NAME"
 
 # Check gofmt
-if [[ "$OS_NAME" != "windows" ]]; then
-    set +e
-    code=0
-    for file in "${GOFILES[@]}"
-    do
-        # Go 1.17 introduced a migration with build constraints
-        # and they offer a migration with gofmt
-        # See https://go.googlesource.com/proposal/+/master/design/draft-gobuild.md#transition for more details
-        if [[ "$file" == "./pkged.go" ]];
-        then
-            gofmt -s -w pkged.go
-        fi
+set +e
+code=0
 
-        # Check the file's formatting
-        test -z $(gofmt -s -l $file)
-        if [[ $? != 0 ]];
-        then
-            code=1
-            echo "$file is not formatted"
-        fi
-    done
-    set -e
-    if [[ $code != 0 ]];
+for file in "${GOFILES[@]}"
+do
+    # Go 1.17 introduced a migration with build constraints
+    # and they offer a migration with gofmt
+    # See https://go.googlesource.com/proposal/+/master/design/draft-gobuild.md#transition for more details
+    if [[ "$file" == "./pkged.go" ]];
     then
-        exit $code
+        gofmt -s -w pkged.go
     fi
 
-    echo "finished gofmt check"
+    # Check the file's formatting
+    test -z $(gofmt -s -l $file)
+    if [[ $? != 0 ]];
+    then
+        code=1
+        echo "$file is not formatted"
+    fi
+done
+set -e
+if [[ $code != 0 ]];
+then
+    exit $code
 fi
+
+echo "finished gofmt check"
 
 # Would be set to 'moov-io' or 'moovfinancial'
 org=$(go mod why | head -n1  | awk -F'/' '{print $2}')
@@ -81,81 +80,77 @@ fi
 if [[ "$EXPERIMENTAL" == *"gitleaks"* ]]; then
     if [[ "$OS_NAME" == "linux" ]]; then wget -q -O ./bin/gitleaks https://github.com/zricethezav/gitleaks/releases/download/v7.6.1/gitleaks-linux-amd64; fi
     if [[ "$OS_NAME" == "osx" ]]; then wget -q -O ./bin/gitleaks https://github.com/zricethezav/gitleaks/releases/download/v7.6.1/gitleaks-darwin-amd64; fi
+    if [[ "$OS_NAME" == "windows" ]]; then wget -q -O ./bin/gitleaks https://github.com/zricethezav/gitleaks/releases/download/v7.6.1/gitleaks-windows-amd64.exe; fi
 
-    if [[ "$OS_NAME" != "windows" ]]; then
-        chmod +x ./bin/gitleaks
+    chmod +x ./bin/gitleaks
 
-        echo "gitleaks version: "$(./bin/gitleaks --version)
+    echo "gitleaks version: "$(./bin/gitleaks --version)
 
-        # Scan a few of the most recent commits
-        depth=10
-        if [ -n "$GITLEAKS_DEPTH" ]; then
-            depth=$GITLEAKS_DEPTH
-        fi
-        ./bin/gitleaks --depth=$depth --path=$(pwd) --verbose
+    # Scan a few of the most recent commits
+    depth=10
+    if [ -n "$GITLEAKS_DEPTH" ]; then
+        depth=$GITLEAKS_DEPTH
     fi
+    ./bin/gitleaks --depth=$depth --path=$(pwd) --verbose
 
-    echo "finished gitleaks check"
+   echo "finished gitleaks check"
 fi
 
 # nancy (vulnerable dependencies)
-if [[ "$OS_NAME" == "linux" ]]; then wget -q -O ./bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.0.29/nancy-v1.0.29-linux-amd64; fi
-if [[ "$OS_NAME" == "osx" ]]; then wget -q -O ./bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.0.29/nancy-v1.0.29-darwin-amd64; fi
-if [[ "$OS_NAME" != "windows" ]]; then
-    chmod +x ./bin/nancy
-    ./bin/nancy --version
+if [[ "$OS_NAME" == "linux" ]]; then wget -q -O ./bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.0.27/nancy-v1.0.27-linux-amd64; fi
+if [[ "$OS_NAME" == "osx" ]]; then wget -q -O ./bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.0.27/nancy-v1.0.27-darwin-amd64; fi
+if [[ "$OS_NAME" == "windows" ]]; then wget -q -O ./bin/nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.0.29/nancy-v1.0.29-windows-amd64.exe; fi
 
-    ignored_deps=(
-        # Consul Enterprise
-        CVE-2018-19653
-        CVE-2020-13250
-        CVE-2020-7219
-        # Vault Enterprise
-        CVE-2020-10660
-        CVE-2020-10661
-        CVE-2020-13223
-        CVE-2020-7220
-        # etcd
-        CVE-2020-15114
-        CVE-2020-15115
-        CVE-2020-15136
-        # jwt-go
-        CVE-2020-26160
-    )
-    ignored=$(printf ",%s" "${ignored_deps[@]}")
-    ignored=${ignored:1}
+chmod +x ./bin/nancy
+./bin/nancy --version
 
-    # Append additional CVEs
-    if [ -n "$IGNORED_CVES" ];
-    then
-        ignored="$ignored"",""$IGNORED_CVES"
-    fi
+ignored_deps=(
+    # Consul Enterprise
+    CVE-2018-19653
+    CVE-2020-13250
+    CVE-2020-7219
+    # Vault Enterprise
+    CVE-2020-10660
+    CVE-2020-10661
+    CVE-2020-13223
+    CVE-2020-7220
+    # etcd
+    CVE-2020-15114
+    CVE-2020-15115
+    CVE-2020-15136
+    # jwt-go
+    CVE-2020-26160
+)
+ignored=$(printf ",%s" "${ignored_deps[@]}")
+ignored=${ignored:1}
 
-    # Clean nancy cache
-    ./bin/nancy --clean-cache
-
-    # Ignore Consul and Vault Enterprise, they need a gocloud.dev release
-    go list -mod=mod -m all | ./bin/nancy --skip-update-check --loud sleuth --exclude-vulnerability "$ignored"
-
-    echo "" # newline
-    echo "finished nancy check"
+# Append additional CVEs
+if [ -n "$IGNORED_CVES" ];
+then
+    ignored="$ignored"",""$IGNORED_CVES"
 fi
 
-# golangci-lint
-if [[ "$OS_NAME" != "windows" ]]; then
-    wget -q -O - -q https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.43.0
+# Clean nancy cache
+./bin/nancy --clean-cache
 
-    enabled="-E=asciicheck,bidichk,bodyclose,exhaustive,gocyclo,misspell,rowserrcheck"
-    if [ -n "$GOLANGCI_LINTERS" ];
-    then
-        enabled="$enabled"",$GOLANGCI_LINTERS"
-    fi
+# Ignore Consul and Vault Enterprise, they need a gocloud.dev release
+go list -mod=mod -m all | ./bin/nancy --skip-update-check --loud sleuth --exclude-vulnerability "$ignored"
 
-    ./bin/golangci-lint --version
-    ./bin/golangci-lint $GOLANGCI_FLAGS run "$enabled" --verbose --skip-dirs="(admin|client)" --timeout=5m --disable=errcheck
+echo "" # newline
+echo "finished nancy check"
 
-    echo "finished golangci-lint check"
+wget -q -O - -q https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.43.0
+
+enabled="-E=asciicheck,bidichk,bodyclose,exhaustive,gocyclo,misspell,rowserrcheck"
+if [ -n "$GOLANGCI_LINTERS" ];
+then
+    enabled="$enabled"",$GOLANGCI_LINTERS"
 fi
+
+./bin/golangci-lint --version
+./bin/golangci-lint $GOLANGCI_FLAGS run "$enabled" --verbose --skip-dirs="(admin|client)" --timeout=5m --disable=errcheck
+
+echo "finished golangci-lint check"
 
 ## Clear GOARCH and GOOS for testing...
 GOARCH=''
