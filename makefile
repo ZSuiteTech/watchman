@@ -72,18 +72,25 @@ else
 	CGO_ENABLED=1 GOOS=$(PLATFORM) go build -o bin/watchman-$(PLATFORM)-amd64 github.com/moov-io/watchman/cmd/server
 endif
 
-docker:
+docker: clean
+
+# All push and tag commands commented out since ZSuite doesn't have accounts on Docker Hub or Quay
+# TODO: push to GitHub packages registry? doesn't have accounts on Docker Hub or Quay
+
 # main server Docker image
 	docker build --pull -t moov/watchman:$(VERSION) -f Dockerfile .
-	docker tag moov/watchman:$(VERSION) moov/watchman:latest
+#	docker tag moov/watchman:$(VERSION) moov/watchman:latest
+# OpenShift Docker image
+	docker build --pull -t quay.io/moov/watchman:$(VERSION) -f Dockerfile-openshift --build-arg VERSION=$(VERSION) .
+#	docker tag quay.io/moov/watchman:$(VERSION) quay.io/moov/watchman:latest
 # Watchman image with static files
 	docker build --pull -t moov/watchman:static -f Dockerfile-static .
 # watchmantest image
 	docker build --pull -t moov/watchmantest:$(VERSION) -f ./cmd/watchmantest/Dockerfile .
-	docker tag moov/watchmantest:$(VERSION) moov/watchmantest:latest
+#	docker tag moov/watchmantest:$(VERSION) moov/watchmantest:latest
 # webhook example
 	docker build --pull -t moov/watchman-webhook-example:$(VERSION) -f ./examples/webhook/Dockerfile .
-	docker tag moov/watchman-webhook-example:$(VERSION) moov/watchman-webhook-example:latest
+#	docker tag moov/watchman-webhook-example:$(VERSION) moov/watchman-webhook-example:latest
 
 release: docker AUTHORS
 	go vet ./...
@@ -91,11 +98,11 @@ release: docker AUTHORS
 	git tag -f $(VERSION)
 
 release-push:
-	docker push moov/watchman:$(VERSION)
-	docker push moov/watchman:latest
-	docker push moov/watchman:static
-	docker push moov/watchmantest:$(VERSION)
-	docker push moov/watchman-webhook-example:$(VERSION)
+#	docker push moov/watchman:$(VERSION)
+#	docker push moov/watchman:latest
+#	docker push moov/watchman:static
+#	docker push moov/watchmantest:$(VERSION)
+#	docker push moov/watchman-webhook-example:$(VERSION)
 
 .PHONY: cover-test cover-web
 cover-test:
