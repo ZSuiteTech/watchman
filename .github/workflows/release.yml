@@ -153,18 +153,21 @@ jobs:
     - name: Docker Webhook Example
       run: make docker-webhook
 
-    - name: Docker Push
-      run: |+
-          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-          make release-push
-      env:
-        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    # All push and tag commands commented out since ZSuite doesn't have accounts on Docker Hub or Quay
+    # TODO: push to GitHub packages registry?
 
-    - name: Quay.io Push
-      run: |+
-          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin quay.io
-          make quay-push
-      env:
-        DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
-        DOCKER_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
+    # - name: Docker Push
+    #   run: |+
+    #       echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+    #       make release-push
+    #   env:
+    #     DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+    #     DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    # - name: Quay.io Push
+    #   run: |+
+    #       echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin quay.io
+    #       make quay-push
+    #   env:
+    #     DOCKER_USERNAME: ${{ secrets.QUAY_USERNAME }}
+    #     DOCKER_PASSWORD: ${{ secrets.QUAY_PASSWORD }}
