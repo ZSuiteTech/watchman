@@ -14,7 +14,8 @@ coverage.txt
 *.out
 
 /bin/
-/lint-project.sh
+# ZSuite: commit our own version of this that does more on Windows
+#/lint-project.sh
 misspell*
 staticcheck*
 

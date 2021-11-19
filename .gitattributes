@@ -1,0 +1,3 @@
+*      text=auto
+# Go's tools expect LFs only! (Resolves issues on Windows)
+*.go   text eol=lf
