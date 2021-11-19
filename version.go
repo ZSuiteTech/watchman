@@ -4,4 +4,4 @@
 
 package watchman
 
-const Version = "v0.14.3"
+const Version = "v0.14.4-zsuite+backport-file-handling-fixes"
