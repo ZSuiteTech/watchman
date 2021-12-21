@@ -46,26 +46,26 @@ type Download struct {
 	Timestamp time.Time `json:"timestamp"`
 
 	// US Office of Foreign Assets Control (OFAC)
-	SDNs              int `json:"SDNs"`
-	Alts              int `json:"altNames"`
-	Addresses         int `json:"addresses"`
-	SectoralSanctions int `json:"sectoralSanctions"`
+	SDNs              int `json:"SDNs,omitempty"`
+	Alts              int `json:"altNames,omitempty"`
+	Addresses         int `json:"addresses,omitempty"`
+	SectoralSanctions int `json:"sectoralSanctions,omitempty"`
 
 	// US Bureau of Industry and Security (BIS)
-	DeniedPersons int `json:"deniedPersons"`
-	BISEntities   int `json:"bisEntities"`
+	DeniedPersons int `json:"deniedPersons,omitempty"`
+	BISEntities   int `json:"bisEntities,omitempty"`
 }
 
 type downloadStats struct {
 	// US Office of Foreign Assets Control (OFAC)
-	SDNs              int `json:"SDNs"`
-	Alts              int `json:"altNames"`
-	Addresses         int `json:"addresses"`
-	SectoralSanctions int `json:"sectoralSanctions"`
+	SDNs              int `json:"SDNs,omitempty"`
+	Alts              int `json:"altNames,omitempty"`
+	Addresses         int `json:"addresses,omitempty"`
+	SectoralSanctions int `json:"sectoralSanctions,omitempty"`
 
 	// US Bureau of Industry and Security (BIS)
-	DeniedPersons int `json:"deniedPersons"`
-	BISEntities   int `json:"bisEntities"`
+	DeniedPersons int `json:"deniedPersons,omitempty"`
+	BISEntities   int `json:"bisEntities,omitempty"`
 
 	RefreshedAt time.Time `json:"timestamp"`
 }
