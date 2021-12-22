@@ -112,15 +112,15 @@ func search(logger log.Logger, searcher *searcher) http.HandlerFunc {
 
 type searchResponse struct {
 	// OFAC
-	SDNs              []SDN     `json:"SDNs"`
-	AltNames          []Alt     `json:"altNames"`
-	Addresses         []Address `json:"addresses"`
-	SectoralSanctions []SSI     `json:"sectoralSanctions"`
+	SDNs              []SDN     `json:"SDNs,omitempty"`
+	AltNames          []Alt     `json:"altNames,omitempty"`
+	Addresses         []Address `json:"addresses,omitempty"`
+	SectoralSanctions []SSI     `json:"sectoralSanctions,omitempty"`
 	// BIS
-	DeniedPersons []DP        `json:"deniedPersons"`
-	BISEntities   []BISEntity `json:"bisEntities"`
+	DeniedPersons []DP        `json:"deniedPersons,omitempty"`
+	BISEntities   []BISEntity `json:"bisEntities,omitempty"`
 	// Metadata
-	RefreshedAt time.Time `json:"refreshedAt"`
+	RefreshedAt time.Time `json:"refreshedAt,omitempty"`
 }
 
 func buildAddressCompares(req addressSearchRequest) []func(*Address) *item {
