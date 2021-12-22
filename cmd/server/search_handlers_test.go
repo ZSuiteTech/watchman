@@ -250,13 +250,13 @@ func TestSearch__NameAndAltName(t *testing.T) {
 	// read response body
 	var wrapper struct {
 		// OFAC
-		SDNs              []*ofac.SDN               `json:"SDNs"`
-		AltNames          []*ofac.AlternateIdentity `json:"altNames"`
-		Addresses         []*ofac.Address           `json:"addresses"`
-		SectoralSanctions []*csl.SSI                `json:"sectoralSanctions"`
+		SDNs              []*ofac.SDN               `json:"SDNs,omitempty"`
+		AltNames          []*ofac.AlternateIdentity `json:"altNames,omitempty"`
+		Addresses         []*ofac.Address           `json:"addresses,omitempty"`
+		SectoralSanctions []*csl.SSI                `json:"sectoralSanctions,omitempty"`
 		// BIS
-		DeniedPersons []*dpl.DPL `json:"deniedPersons"`
-		BISEntities   []*csl.EL  `json:"bisEntities"`
+		DeniedPersons []*dpl.DPL `json:"deniedPersons,omitempty"`
+		BISEntities   []*csl.EL  `json:"bisEntities,omitempty"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&wrapper); err != nil {
 		t.Fatal(err)
@@ -313,12 +313,12 @@ func TestSearch__Name(t *testing.T) {
 
 	var wrapper struct {
 		// OFAC
-		SDNs []*ofac.SDN               `json:"SDNs"`
-		Alts []*ofac.AlternateIdentity `json:"altNames"`
-		SSIs []*csl.SSI                `json:"sectoralSanctions"`
+		SDNs []*ofac.SDN               `json:"SDNs,omitempty"`
+		Alts []*ofac.AlternateIdentity `json:"altNames,omitempty"`
+		SSIs []*csl.SSI                `json:"sectoralSanctions,omitempty"`
 		// BIS
-		DPs []*dpl.DPL `json:"deniedPersons"`
-		ELs []*csl.EL  `json:"bisEntities"`
+		DPs []*dpl.DPL `json:"deniedPersons,omitempty"`
+		ELs []*csl.EL  `json:"bisEntities,omitempty"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&wrapper); err != nil {
 		t.Fatal(err)
