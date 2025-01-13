@@ -5,13 +5,13 @@
 package dpl
 
 import (
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/moov-io/base/log"
 )
 
 func TestDownloader(t *testing.T) {
@@ -23,18 +23,18 @@ func TestDownloader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file == "" {
+	if len(file) == 0 {
 		t.Fatal("no DPL file")
 	}
-	defer os.RemoveAll(filepath.Dir(file))
-
-	if !strings.EqualFold("dpl.txt", filepath.Base(file)) {
-		t.Errorf("unknown file %s", file)
+	for filename := range file {
+		if !strings.EqualFold("dpl.txt", filepath.Base(filename)) {
+			t.Errorf("unknown file %s", file)
+		}
 	}
 }
 
 func TestDownloader__initialDir(t *testing.T) {
-	dir, err := ioutil.TempDir("", "iniital-dir")
+	dir, err := os.MkdirTemp("", "iniital-dir")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestDownloader__initialDir(t *testing.T) {
 
 	mk := func(t *testing.T, name string, body string) {
 		path := filepath.Join(dir, name)
-		if err := ioutil.WriteFile(path, []byte(body), 0600); err != nil {
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
 			t.Fatalf("writing %s: %v", path, err)
 		}
 	}
@@ -55,19 +55,20 @@ func TestDownloader__initialDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if file == "" {
+	if len(file) == 0 {
 		t.Fatal("no DPL file")
 	}
-
-	if strings.EqualFold("dpl.txt", filepath.Base(file)) {
-		bs, err := ioutil.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
+	for fn, fd := range file {
+		if strings.EqualFold("dpl.txt", filepath.Base(fn)) {
+			bs, err := io.ReadAll(fd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if v := string(bs); v != "file=dpl.txt" {
+				t.Errorf("dpl.txt: %v", v)
+			}
+		} else {
+			t.Fatalf("unknown file: %v", file)
 		}
-		if v := string(bs); v != "file=dpl.txt" {
-			t.Errorf("dpl.txt: %v", v)
-		}
-	} else {
-		t.Fatalf("unknown file: %v", file)
 	}
 }

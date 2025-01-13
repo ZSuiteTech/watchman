@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -8,22 +8,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"net/http"
-	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/moov-io/base/strx"
-	"github.com/moov-io/watchman/pkg/csl"
+	"github.com/moov-io/base/log"
+	"github.com/moov-io/watchman/internal/prepare"
+	"github.com/moov-io/watchman/internal/stringscore"
+	"github.com/moov-io/watchman/pkg/csl_eu"
+	"github.com/moov-io/watchman/pkg/csl_uk"
+	"github.com/moov-io/watchman/pkg/csl_us"
 	"github.com/moov-io/watchman/pkg/dpl"
 	"github.com/moov-io/watchman/pkg/ofac"
 
-	"github.com/go-kit/kit/log"
-	"github.com/xrash/smetrics"
 	"go4.org/syncutil"
 )
 
@@ -33,35 +31,60 @@ var (
 	softResultsLimit, hardResultsLimit = 10, 100
 )
 
-// searcher holds precomputed data for each object available to search against.
+// searcher holds prepare.LowerAndRemovePunctuationd data for each object available to search against.
 // This data comes from various US and EU Federal agencies
 type searcher struct {
 	// OFAC
-	SDNs      []*SDN
-	Addresses []*Address
-	Alts      []*Alt
-	SSIs      []*SSI
+	SDNs        []*SDN
+	Addresses   []*Address
+	Alts        []*Alt
+	SDNComments []*ofac.SDNComments
 
 	// BIS
-	DPs         []*DP
-	BISEntities []*BISEntity
+	DPs []*DP
+
+	// TODO: this could be refactored into sub structs that have us/eu (and eventually others)
+
+	// US Consolidated Screening List
+	BISEntities      []*Result[csl_us.EL]
+	MilitaryEndUsers []*Result[csl_us.MEU]
+	SSIs             []*Result[csl_us.SSI]
+	UVLs             []*Result[csl_us.UVL]
+	ISNs             []*Result[csl_us.ISN]
+	FSEs             []*Result[csl_us.FSE]
+	PLCs             []*Result[csl_us.PLC]
+	CAPs             []*Result[csl_us.CAP]
+	DTCs             []*Result[csl_us.DTC]
+	CMICs            []*Result[csl_us.CMIC]
+	NS_MBSs          []*Result[csl_us.NS_MBS]
+
+	// EU Consolidated List of Sactions
+	EUCSL []*Result[csl_eu.CSLRecord]
+
+	// UK Consolidated List of Sactions - OFSI
+	UKCSL []*Result[csl_uk.CSLRecord]
+
+	// UK Sanctions List
+	UKSanctionsList []*Result[csl_uk.SanctionsListRecord]
 
 	// metadata
 	lastRefreshedAt time.Time
 	sync.RWMutex    // protects all above fields
 	*syncutil.Gate  // limits concurrent processing
 
-	pipe *pipeliner
+	pipe *prepare.Pipeliner
 
 	logger log.Logger
 }
 
-func newSearcher(logger log.Logger, pipeline *pipeliner, workers int) *searcher {
-	logger.Log("search", fmt.Sprintf("allowing only %d workers", workers))
+func newSearcher(logger log.Logger, pipeline *prepare.Pipeliner, workers int) *searcher {
+	logger.Logf("allowing only %d workers for search", workers)
 	return &searcher{
-		logger: logger,
-		pipe:   pipeline,
-		Gate:   syncutil.NewGate(workers),
+		logger: logger.With(log.Fields{
+			"component": log.String("pipeline"),
+		}),
+		pipe: pipeline,
+		Gate: syncutil.NewGate(workers),
 	}
 }
 
@@ -94,7 +117,7 @@ var (
 		return func(add *Address) *item {
 			return &item{
 				value:  add,
-				weight: jaroWinkler(add.address, precompute(needleAddr)),
+				weight: stringscore.JaroWinkler(add.address, prepare.LowerAndRemovePunctuation(needleAddr)),
 			}
 		}
 	}
@@ -106,7 +129,7 @@ var (
 		return func(add *Address) *item {
 			return &item{
 				value:  add,
-				weight: jaroWinkler(add.citystate, precompute(needleCityState)),
+				weight: stringscore.JaroWinkler(add.citystate, prepare.LowerAndRemovePunctuation(needleCityState)),
 			}
 		}
 	}
@@ -116,7 +139,7 @@ var (
 		return func(add *Address) *item {
 			return &item{
 				value:  add,
-				weight: jaroWinkler(add.country, precompute(needleCountry)),
+				weight: stringscore.JaroWinkler(add.country, prepare.LowerAndRemovePunctuation(needleCountry)),
 			}
 		}
 	}
@@ -192,7 +215,7 @@ func TopAddressesFn(limit int, minMatch float64, addresses []*Address, compare f
 }
 
 func largestToAddresses(xs *largest) []Address {
-	out := make([]Address, 0)
+	out := make([]Address, 0, xs.capacity)
 	for i := range xs.items {
 		if v := xs.items[i]; v != nil {
 			aa, ok := v.value.(*Address)
@@ -224,7 +247,8 @@ func (s *searcher) FindAlts(limit int, id string) []*ofac.AlternateIdentity {
 }
 
 func (s *searcher) TopAltNames(limit int, minMatch float64, alt string) []Alt {
-	alt = precompute(alt)
+	alt = prepare.LowerAndRemovePunctuation(alt)
+	altTokens := strings.Fields(alt)
 
 	s.RLock()
 	defer s.RUnlock()
@@ -243,14 +267,15 @@ func (s *searcher) TopAltNames(limit int, minMatch float64, alt string) []Alt {
 			defer wg.Done()
 			defer s.Gate.Done()
 			xs.add(&item{
-				value:  s.Alts[i],
-				weight: jaroWinkler(s.Alts[i].name, alt),
+				matched: s.Alts[i].name,
+				value:   s.Alts[i],
+				weight:  stringscore.BestPairsJaroWinkler(altTokens, s.Alts[i].name),
 			})
 		}(i)
 	}
 	wg.Wait()
 
-	out := make([]Alt, 0)
+	out := make([]Alt, 0, limit)
 	for i := range xs.items {
 		if v := xs.items[i]; v != nil {
 			aa, ok := v.value.(*Alt)
@@ -259,6 +284,7 @@ func (s *searcher) TopAltNames(limit int, minMatch float64, alt string) []Alt {
 			}
 			alt := *aa
 			alt.match = v.weight
+			alt.matchedName = v.matched
 			out = append(out, alt)
 		}
 	}
@@ -276,6 +302,10 @@ func (s *searcher) debugSDN(entityID string) *SDN {
 	s.RLock()
 	defer s.RUnlock()
 
+	return s.findSDNWithoutLock(entityID)
+}
+
+func (s *searcher) findSDNWithoutLock(entityID string) *SDN {
 	for i := range s.SDNs {
 		if s.SDNs[i].EntityID == entityID {
 			return s.SDNs[i]
@@ -339,7 +369,8 @@ func (s *searcher) FindSDNsByRemarksID(limit int, id string) []*SDN {
 }
 
 func (s *searcher) TopSDNs(limit int, minMatch float64, name string, keepSDN func(*SDN) bool) []*SDN {
-	name = precompute(name)
+	name = prepare.LowerAndRemovePunctuation(name)
+	nameTokens := strings.Fields(name)
 
 	s.RLock()
 	defer s.RUnlock()
@@ -362,14 +393,15 @@ func (s *searcher) TopSDNs(limit int, minMatch float64, name string, keepSDN fun
 			defer wg.Done()
 			defer s.Gate.Done()
 			xs.add(&item{
-				value:  s.SDNs[i],
-				weight: jaroWinkler(s.SDNs[i].name, name),
+				matched: s.SDNs[i].name,
+				value:   s.SDNs[i],
+				weight:  stringscore.BestPairsJaroWinkler(nameTokens, s.SDNs[i].name),
 			})
 		}(i)
 	}
 	wg.Wait()
 
-	out := make([]*SDN, 0)
+	out := make([]*SDN, 0, limit)
 	for i := range xs.items {
 		if v := xs.items[i]; v != nil {
 			ss, ok := v.value.(*SDN)
@@ -378,6 +410,7 @@ func (s *searcher) TopSDNs(limit int, minMatch float64, name string, keepSDN fun
 			}
 			sdn := *ss // deref for a copy
 			sdn.match = v.weight
+			sdn.matchedName = v.matched
 			out = append(out, &sdn)
 		}
 	}
@@ -385,7 +418,8 @@ func (s *searcher) TopSDNs(limit int, minMatch float64, name string, keepSDN fun
 }
 
 func (s *searcher) TopDPs(limit int, minMatch float64, name string) []DP {
-	name = precompute(name)
+	name = prepare.LowerAndRemovePunctuation(name)
+	nameTokens := strings.Fields(name)
 
 	s.RLock()
 	defer s.RUnlock()
@@ -404,14 +438,15 @@ func (s *searcher) TopDPs(limit int, minMatch float64, name string) []DP {
 			defer wg.Done()
 			defer s.Gate.Done()
 			xs.add(&item{
-				value:  s.DPs[i],
-				weight: jaroWinkler(s.DPs[i].name, name),
+				matched: s.DPs[i].name,
+				value:   s.DPs[i],
+				weight:  stringscore.BestPairsJaroWinkler(nameTokens, s.DPs[i].name),
 			})
 		}(i)
 	}
 	wg.Wait()
 
-	out := make([]DP, 0)
+	out := make([]DP, 0, limit)
 	for _, thisItem := range xs.items {
 		if v := thisItem; v != nil {
 			ss, ok := v.value.(*DP)
@@ -420,129 +455,24 @@ func (s *searcher) TopDPs(limit int, minMatch float64, name string) []DP {
 			}
 			dp := *ss
 			dp.match = v.weight
+			dp.matchedName = v.matched
 			out = append(out, dp)
 		}
 	}
 	return out
 }
 
-// TopSSIs searches Sectoral Sanctions records by Name and Alias
-func (s *searcher) TopSSIs(limit int, minMatch float64, name string) []SSI {
-	name = precompute(name)
-
-	s.RLock()
-	defer s.RUnlock()
-
-	if len(s.SSIs) == 0 {
-		return nil
-	}
-	xs := newLargest(limit, minMatch)
-
-	var wg sync.WaitGroup
-	wg.Add(len(s.SSIs))
-
-	for i := range s.SSIs {
-		s.Gate.Start()
-		go func(i int) {
-			defer wg.Done()
-			defer s.Gate.Done()
-			it := &item{
-				value:  s.SSIs[i],
-				weight: jaroWinkler(s.SSIs[i].name, name),
-			}
-			for _, alt := range s.SSIs[i].SectoralSanction.AlternateNames {
-				if alt == "" {
-					continue
-				}
-				currWeight := jaroWinkler(alt, name)
-				if currWeight > it.weight {
-					it.weight = currWeight
-				}
-			}
-			xs.add(it)
-		}(i)
-	}
-	wg.Wait()
-
-	out := make([]SSI, 0)
-	for _, thisItem := range xs.items {
-		if v := thisItem; v != nil {
-			ss, ok := v.value.(*SSI)
-			if !ok {
-				continue
-			}
-			ssi := *ss
-			ssi.match = v.weight
-			out = append(out, ssi)
-		}
-	}
-	return out
-}
-
-// TopBISEntities searches BIS Entity List records by name and alias
-func (s *searcher) TopBISEntities(limit int, minMatch float64, name string) []BISEntity {
-	name = precompute(name)
-
-	s.RLock()
-	defer s.RUnlock()
-
-	if len(s.BISEntities) == 0 {
-		return nil
-	}
-
-	xs := newLargest(limit, minMatch)
-
-	var wg sync.WaitGroup
-	wg.Add(len(s.BISEntities))
-
-	for i := range s.BISEntities {
-		s.Gate.Start()
-		go func(i int) {
-			defer wg.Done()
-			defer s.Gate.Done()
-
-			it := &item{
-				value:  s.BISEntities[i],
-				weight: jaroWinkler(s.BISEntities[i].name, name),
-			}
-			for _, alt := range s.BISEntities[i].Entity.AlternateNames {
-				if alt == "" {
-					continue
-				}
-				currWeight := jaroWinkler(alt, name)
-				if currWeight > it.weight {
-					it.weight = currWeight
-				}
-			}
-
-			xs.add(it)
-		}(i)
-	}
-	wg.Wait()
-
-	out := make([]BISEntity, 0)
-	for _, thisItem := range xs.items {
-		if v := thisItem; v != nil {
-			ss, ok := v.value.(*BISEntity)
-			if !ok {
-				continue
-			}
-			el := *ss
-			el.match = v.weight
-			out = append(out, el)
-		}
-	}
-	return out
-}
-
-// SDN is ofac.SDN wrapped with precomputed search metadata
+// SDN is ofac.SDN wrapped with prepare.LowerAndRemovePunctuationd search metadata
 type SDN struct {
 	*ofac.SDN
 
 	// match holds the match ratio for an SDN in search results
 	match float64
 
-	// name is precomputed for speed
+	// matchedName holds the highest scoring term from the search query
+	matchedName string
+
+	// name is prepare.LowerAndRemovePunctuationd for speed
 	name string
 
 	// id is the parseed ID value from an SDN's remarks field. Often this
@@ -557,10 +487,12 @@ type SDN struct {
 func (s SDN) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		*ofac.SDN
-		Match float64 `json:"match"`
+		Match       float64 `json:"match"`
+		MatchedName string  `json:"matchedName"`
 	}{
 		s.SDN,
 		s.match,
+		s.matchedName,
 	})
 }
 
@@ -574,13 +506,12 @@ func findAddresses(entityID string, addrs []*ofac.Address) []*ofac.Address {
 	return out
 }
 
-func precomputeSDNs(sdns []*ofac.SDN, addrs []*ofac.Address, pipe *pipeliner) []*SDN {
+func precomputeSDNs(sdns []*ofac.SDN, addrs []*ofac.Address, pipe *prepare.Pipeliner) []*SDN {
 	out := make([]*SDN, len(sdns))
 	for i := range sdns {
-		nn := sdnName(sdns[i], findAddresses(sdns[i].EntityID, addrs))
+		nn := prepare.SdnName(sdns[i], findAddresses(sdns[i].EntityID, addrs))
 
 		if err := pipe.Do(nn); err != nil {
-			pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining SDN: %v", err))
 			continue
 		}
 
@@ -593,13 +524,13 @@ func precomputeSDNs(sdns []*ofac.SDN, addrs []*ofac.Address, pipe *pipeliner) []
 	return out
 }
 
-// Address is ofac.Address wrapped with precomputed search metadata
+// Address is ofac.Address wrapped with prepare.LowerAndRemovePunctuationd search metadata
 type Address struct {
 	Address *ofac.Address
 
 	match float64 // match %
 
-	// precomputed fields for speed
+	// prepare.LowerAndRemovePunctuationd fields for speed
 	address, citystate, country string
 }
 
@@ -619,21 +550,25 @@ func precomputeAddresses(adds []*ofac.Address) []*Address {
 	for i := range adds {
 		out[i] = &Address{
 			Address:   adds[i],
-			address:   precompute(adds[i].Address),
-			citystate: precompute(adds[i].CityStateProvincePostalCode),
-			country:   precompute(adds[i].Country),
+			address:   prepare.LowerAndRemovePunctuation(adds[i].Address),
+			citystate: prepare.LowerAndRemovePunctuation(adds[i].CityStateProvincePostalCode),
+			country:   prepare.LowerAndRemovePunctuation(adds[i].Country),
 		}
 	}
 	return out
 }
 
-// Alt is an ofac.AlternateIdentity wrapped with precomputed search metadata
+// Alt is an ofac.AlternateIdentity wrapped with prepare.LowerAndRemovePunctuationd search metadata
 type Alt struct {
 	AlternateIdentity *ofac.AlternateIdentity
 
-	match float64 // match %
+	// match holds the match ratio for an Alt in search results
+	match float64
 
-	// name is precomputed for speed
+	// matchedName holds the highest scoring term from the search query
+	matchedName string
+
+	// name is prepare.LowerAndRemovePunctuationd for speed
 	name string
 }
 
@@ -641,20 +576,21 @@ type Alt struct {
 func (a Alt) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		*ofac.AlternateIdentity
-		Match float64 `json:"match"`
+		Match       float64 `json:"match"`
+		MatchedName string  `json:"matchedName"`
 	}{
 		a.AlternateIdentity,
 		a.match,
+		a.matchedName,
 	})
 }
 
-func precomputeAlts(alts []*ofac.AlternateIdentity, pipe *pipeliner) []*Alt {
+func precomputeAlts(alts []*ofac.AlternateIdentity, pipe *prepare.Pipeliner) []*Alt {
 	out := make([]*Alt, len(alts))
 	for i := range alts {
-		an := altName(alts[i])
+		an := prepare.AltName(alts[i])
 
 		if err := pipe.Do(an); err != nil {
-			pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining SDN: %v", err))
 			continue
 		}
 
@@ -666,10 +602,11 @@ func precomputeAlts(alts []*ofac.AlternateIdentity, pipe *pipeliner) []*Alt {
 	return out
 }
 
-// DP is a BIS Denied Person wrapped with precomputed search metadata
+// DP is a BIS Denied Person wrapped with prepare.LowerAndRemovePunctuationd search metadata
 type DP struct {
 	DeniedPerson *dpl.DPL
 	match        float64
+	matchedName  string
 	name         string
 }
 
@@ -677,19 +614,20 @@ type DP struct {
 func (d DP) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		*dpl.DPL
-		Match float64 `json:"match"`
+		Match       float64 `json:"match"`
+		MatchedName string  `json:"matchedName"`
 	}{
 		d.DeniedPerson,
 		d.match,
+		d.matchedName,
 	})
 }
 
-func precomputeDPs(persons []*dpl.DPL, pipe *pipeliner) []*DP {
+func precomputeDPs(persons []*dpl.DPL, pipe *prepare.Pipeliner) []*DP {
 	out := make([]*DP, len(persons))
 	for i := range persons {
-		nn := dpName(persons[i])
+		nn := prepare.DPName(persons[i])
 		if err := pipe.Do(nn); err != nil {
-			pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining DP: %v", err))
 			continue
 		}
 		out[i] = &DP{
@@ -698,171 +636,6 @@ func precomputeDPs(persons []*dpl.DPL, pipe *pipeliner) []*DP {
 		}
 	}
 	return out
-}
-
-type SSI struct {
-	SectoralSanction *csl.SSI
-	match            float64
-	name             string
-}
-
-func (s SSI) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		*csl.SSI
-		Match float64 `json:"match"`
-	}{
-		s.SectoralSanction,
-		s.match,
-	})
-}
-
-func precomputeSSIs(ssis []*csl.SSI, pipe *pipeliner) []*SSI {
-	out := make([]*SSI, len(ssis))
-	for i, ssi := range ssis {
-		nn := ssiName(ssi)
-		if err := pipe.Do(nn); err != nil {
-			pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining SSI: %v", err))
-			continue
-		}
-
-		var altNames []string
-		for i := range ssi.AlternateNames {
-			altNN := &Name{Processed: ssi.AlternateNames[i]}
-			if err := pipe.Do(altNN); err != nil {
-				pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining alt: %v", err))
-				continue
-			}
-			altNames = append(altNames, altNN.Processed)
-		}
-		ssi.AlternateNames = altNames
-
-		out[i] = &SSI{
-			SectoralSanction: ssi,
-			name:             nn.Processed,
-		}
-	}
-	return out
-}
-
-type BISEntity struct {
-	Entity *csl.EL
-	match  float64
-	name   string
-}
-
-func (e BISEntity) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		*csl.EL
-		Match float64 `json:"match"`
-	}{
-		e.Entity,
-		e.match,
-	})
-}
-
-func precomputeBISEntities(els []*csl.EL, pipe *pipeliner) []*BISEntity {
-	out := make([]*BISEntity, len(els))
-	for i, el := range els {
-		nn := bisEntityName(el)
-		if err := pipe.Do(nn); err != nil {
-			pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining EL: %v", err))
-			continue
-		}
-
-		var altNames []string
-		for i := range el.AlternateNames {
-			altNN := &Name{Processed: el.AlternateNames[i]}
-			if err := pipe.Do(altNN); err != nil {
-				pipe.logger.Log("pipeline", fmt.Sprintf("problem pipelining alt: %v", err))
-				continue
-			}
-			altNames = append(altNames, altNN.Processed)
-		}
-		el.AlternateNames = altNames
-
-		out[i] = &BISEntity{
-			Entity: el,
-			name:   nn.Processed,
-		}
-	}
-	return out
-}
-
-func extractSearchLimit(r *http.Request) int {
-	limit := softResultsLimit
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, _ := strconv.Atoi(v)
-		if n > 0 {
-			limit = n
-		}
-	}
-	if limit > hardResultsLimit {
-		limit = hardResultsLimit
-	}
-	return limit
-}
-
-func extractSearchMinMatch(r *http.Request) float64 {
-	if v := r.URL.Query().Get("minMatch"); v != "" {
-		n, _ := strconv.ParseFloat(v, 64)
-		return n
-	}
-	return 0.00
-}
-
-var (
-	exactMatchFavoritism = readExactMatchFavoritism(os.Getenv("EXACT_MATCH_FAVORITISM"))
-)
-
-func readExactMatchFavoritism(input string) float64 {
-	weight, _ := strconv.ParseFloat(strx.Or(input, "0.0"), 32)
-	return weight
-}
-
-// jaroWinkler runs the similarly named algorithm over the two input strings and averages their match percentages
-// according to the second string (assumed to be the user's query)
-//
-// For more details see https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance
-func jaroWinkler(s1, s2 string) float64 {
-	maxMatch := func(word string, parts []string) float64 {
-		if len(parts) == 0 {
-			return 0.0
-		}
-		max := smetrics.JaroWinkler(word, parts[0], 0.7, 4)
-		for i := 1; i < len(parts); i++ {
-			if score := smetrics.JaroWinkler(word, parts[i], 0.7, 4); score > max {
-				max = score
-			}
-		}
-		return max
-	}
-
-	s1Parts, s2Parts := strings.Fields(s1), strings.Fields(s2)
-	if len(s1Parts) == 0 || len(s2Parts) == 0 {
-		return 0.0 // avoid returning NaN later on
-	}
-
-	var scores []float64
-	for i := range s1Parts {
-		max := maxMatch(s1Parts[i], s2Parts)
-		if max >= 1.0 {
-			max += exactMatchFavoritism
-		}
-		scores = append(scores, max)
-	}
-
-	// average the highest N scores where N is the words in our query (s2).
-	sort.Float64s(scores)
-	if len(s1Parts) > len(s2Parts) && len(s2Parts) > 2 {
-		scores = scores[len(s1Parts)-len(s2Parts):]
-	}
-
-	var sum float64
-	for i := range scores {
-		sum += scores[i]
-	}
-
-	return sum / float64(len(scores))
 }
 
 // extractIDFromRemark attempts to parse out a National ID or similar governmental ID value

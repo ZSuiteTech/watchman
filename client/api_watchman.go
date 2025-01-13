@@ -26,406 +26,6 @@ var (
 // WatchmanApiService WatchmanApi service
 type WatchmanApiService service
 
-// AddOfacCompanyNameWatchOpts Optional parameters for the method 'AddOfacCompanyNameWatch'
-type AddOfacCompanyNameWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-AddOfacCompanyNameWatch Watch company
-Watch a company by its name. The match percentage will be included in the webhook&#39;s JSON payload.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param name Company name used to match and send watch notifications
- * @param ofacWatchRequest
- * @param optional nil or *AddOfacCompanyNameWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacWatch
-*/
-func (a *WatchmanApiService) AddOfacCompanyNameWatch(ctx _context.Context, name string, ofacWatchRequest OfacWatchRequest, localVarOptionals *AddOfacCompanyNameWatchOpts) (OfacWatch, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodPost
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacWatch
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/companies/watch"
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	localVarQueryParams.Add("name", parameterToString(name, ""))
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	// body params
-	localVarPostBody = &ofacWatchRequest
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-// AddOfacCompanyWatchOpts Optional parameters for the method 'AddOfacCompanyWatch'
-type AddOfacCompanyWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-AddOfacCompanyWatch Watch OFAC company
-Add ID watch on an OFAC Company.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param companyID Company ID
- * @param ofacWatchRequest
- * @param optional nil or *AddOfacCompanyWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacWatch
-*/
-func (a *WatchmanApiService) AddOfacCompanyWatch(ctx _context.Context, companyID string, ofacWatchRequest OfacWatchRequest, localVarOptionals *AddOfacCompanyWatchOpts) (OfacWatch, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodPost
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacWatch
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/companies/{companyID}/watch"
-	localVarPath = strings.Replace(localVarPath, "{"+"companyID"+"}", _neturl.QueryEscape(parameterToString(companyID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	// body params
-	localVarPostBody = &ofacWatchRequest
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-// AddOfacCustomerNameWatchOpts Optional parameters for the method 'AddOfacCustomerNameWatch'
-type AddOfacCustomerNameWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-AddOfacCustomerNameWatch Watch customer
-Watch a customer by its name. The match percentage will be included in the webhook&#39;s JSON payload.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param name Individual name used to match and send watch notifications
- * @param ofacWatchRequest
- * @param optional nil or *AddOfacCustomerNameWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacWatch
-*/
-func (a *WatchmanApiService) AddOfacCustomerNameWatch(ctx _context.Context, name string, ofacWatchRequest OfacWatchRequest, localVarOptionals *AddOfacCustomerNameWatchOpts) (OfacWatch, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodPost
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacWatch
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/customers/watch"
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	localVarQueryParams.Add("name", parameterToString(name, ""))
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	// body params
-	localVarPostBody = &ofacWatchRequest
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-// AddOfacCustomerWatchOpts Optional parameters for the method 'AddOfacCustomerWatch'
-type AddOfacCustomerWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-AddOfacCustomerWatch Watch OFAC customer
-Add ID watch on an OFAC Customer.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param customerID Customer ID
- * @param ofacWatchRequest
- * @param optional nil or *AddOfacCustomerWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacWatch
-*/
-func (a *WatchmanApiService) AddOfacCustomerWatch(ctx _context.Context, customerID string, ofacWatchRequest OfacWatchRequest, localVarOptionals *AddOfacCustomerWatchOpts) (OfacWatch, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodPost
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacWatch
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/customers/{customerID}/watch"
-	localVarPath = strings.Replace(localVarPath, "{"+"customerID"+"}", _neturl.QueryEscape(parameterToString(customerID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	// body params
-	localVarPostBody = &ofacWatchRequest
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-			return localVarReturnValue, localVarHTTPResponse, newErr
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
 // GetLatestDownloadsOpts Optional parameters for the method 'GetLatestDownloads'
 type GetLatestDownloadsOpts struct {
 	XRequestID optional.String
@@ -435,10 +35,11 @@ type GetLatestDownloadsOpts struct {
 /*
 GetLatestDownloads Get latest downloads
 Return list of recent downloads of list data.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param optional nil or *GetLatestDownloadsOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
- * @param "Limit" (optional.Int32) -  Maximum number of downloads to return sorted by their timestamp in decending order.
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param optional nil or *GetLatestDownloadsOpts - Optional Parameters:
+  - @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+  - @param "Limit" (optional.Int32) -  Maximum number of downloads to return sorted by their timestamp in decending order.
+
 @return []Download
 */
 func (a *WatchmanApiService) GetLatestDownloads(ctx _context.Context, localVarOptionals *GetLatestDownloadsOpts) ([]Download, *_nethttp.Response, error) {
@@ -525,297 +126,6 @@ func (a *WatchmanApiService) GetLatestDownloads(ctx _context.Context, localVarOp
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-// GetOfacCompanyOpts Optional parameters for the method 'GetOfacCompany'
-type GetOfacCompanyOpts struct {
-	XRequestID optional.String
-}
-
-/*
-GetOfacCompany Get company
-Get information about a company, trust, or organization such as addresses, alternate names, and remarks.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param companyID Company ID
- * @param optional nil or *GetOfacCompanyOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacCompany
-*/
-func (a *WatchmanApiService) GetOfacCompany(ctx _context.Context, companyID string, localVarOptionals *GetOfacCompanyOpts) (OfacCompany, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodGet
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacCompany
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/companies/{companyID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"companyID"+"}", _neturl.QueryEscape(parameterToString(companyID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-// GetOfacCustomerOpts Optional parameters for the method 'GetOfacCustomer'
-type GetOfacCustomerOpts struct {
-	XRequestID optional.String
-}
-
-/*
-GetOfacCustomer Get customer
-Get information about a customer&#39;s addresses, alternate names, and SDN metadata.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param customerID Customer ID
- * @param optional nil or *GetOfacCustomerOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacCustomer
-*/
-func (a *WatchmanApiService) GetOfacCustomer(ctx _context.Context, customerID string, localVarOptionals *GetOfacCustomerOpts) (OfacCustomer, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodGet
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacCustomer
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/customers/{customerID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"customerID"+"}", _neturl.QueryEscape(parameterToString(customerID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
-// GetSDNOpts Optional parameters for the method 'GetSDN'
-type GetSDNOpts struct {
-	XRequestID optional.String
-}
-
-/*
-GetSDN Get SDN
-Get SDN details
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param sdnID SDN ID
- * @param optional nil or *GetSDNOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-@return OfacSdn
-*/
-func (a *WatchmanApiService) GetSDN(ctx _context.Context, sdnID string, localVarOptionals *GetSDNOpts) (OfacSdn, *_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodGet
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-		localVarReturnValue  OfacSdn
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/sdn/{sdnID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"sdnID"+"}", _neturl.QueryEscape(parameterToString(sdnID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return localVarReturnValue, nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarReturnValue, localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarReturnValue, localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-	if err != nil {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: err.Error(),
-		}
-		return localVarReturnValue, localVarHTTPResponse, newErr
-	}
-
-	return localVarReturnValue, localVarHTTPResponse, nil
-}
-
 // GetSDNAddressesOpts Optional parameters for the method 'GetSDNAddresses'
 type GetSDNAddressesOpts struct {
 	XRequestID optional.String
@@ -823,10 +133,11 @@ type GetSDNAddressesOpts struct {
 
 /*
 GetSDNAddresses Get SDN addresses
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param sdnID SDN ID
- * @param optional nil or *GetSDNAddressesOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param sdnID SDN ID
+  - @param optional nil or *GetSDNAddressesOpts - Optional Parameters:
+  - @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+
 @return []OfacEntityAddress
 */
 func (a *WatchmanApiService) GetSDNAddresses(ctx _context.Context, sdnID string, localVarOptionals *GetSDNAddressesOpts) ([]OfacEntityAddress, *_nethttp.Response, error) {
@@ -919,10 +230,11 @@ type GetSDNAltNamesOpts struct {
 
 /*
 GetSDNAltNames Get SDN alt names
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param sdnID SDN ID
- * @param optional nil or *GetSDNAltNamesOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param sdnID SDN ID
+  - @param optional nil or *GetSDNAltNamesOpts - Optional Parameters:
+  - @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+
 @return []OfacAlt
 */
 func (a *WatchmanApiService) GetSDNAltNames(ctx _context.Context, sdnID string, localVarOptionals *GetSDNAltNamesOpts) ([]OfacAlt, *_nethttp.Response, error) {
@@ -1016,13 +328,14 @@ type GetUIValuesOpts struct {
 /*
 GetUIValues Get UI values
 Return an ordered distinct list of keys for an SDN property.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param key SDN property to lookup. Values are sdnType, ofacProgram
- * @param optional nil or *GetUIValuesOpts - Optional Parameters:
- * @param "Limit" (optional.Int32) -  Maximum number of UI keys returned
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param key SDN property to lookup. Values are sdnType, ofacProgram
+  - @param optional nil or *GetUIValuesOpts - Optional Parameters:
+  - @param "Limit" (optional.Int32) -  Maximum number of UI keys returned
+
 @return []SdnType
 */
-func (a *WatchmanApiService) GetUIValues(ctx _context.Context, key string, localVarOptionals *GetUIValuesOpts) ([]SdnType, *_nethttp.Response, error) {
+func (a *WatchmanApiService) GetUIValues(ctx _context.Context, key SdnType, localVarOptionals *GetUIValuesOpts) ([]SdnType, *_nethttp.Response, error) {
 	var (
 		localVarHTTPMethod   = _nethttp.MethodGet
 		localVarPostBody     interface{}
@@ -1108,7 +421,7 @@ func (a *WatchmanApiService) GetUIValues(ctx _context.Context, key string, local
 /*
 Ping Ping Watchman service
 Check if the Watchman service is running.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
 */
 func (a *WatchmanApiService) Ping(ctx _context.Context) (*_nethttp.Response, error) {
 	var (
@@ -1169,360 +482,6 @@ func (a *WatchmanApiService) Ping(ctx _context.Context) (*_nethttp.Response, err
 	return localVarHTTPResponse, nil
 }
 
-// RemoveOfacCompanyNameWatchOpts Optional parameters for the method 'RemoveOfacCompanyNameWatch'
-type RemoveOfacCompanyNameWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-RemoveOfacCompanyNameWatch Remove company watch
-Delete a company name watch.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param watchID Watch ID, used to identify a specific watch
- * @param name Company name watch
- * @param optional nil or *RemoveOfacCompanyNameWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-*/
-func (a *WatchmanApiService) RemoveOfacCompanyNameWatch(ctx _context.Context, watchID string, name string, localVarOptionals *RemoveOfacCompanyNameWatchOpts) (*_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodDelete
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/companies/watch/{watchID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"watchID"+"}", _neturl.QueryEscape(parameterToString(watchID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	localVarQueryParams.Add("name", parameterToString(name, ""))
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarHTTPResponse, newErr
-	}
-
-	return localVarHTTPResponse, nil
-}
-
-// RemoveOfacCompanyWatchOpts Optional parameters for the method 'RemoveOfacCompanyWatch'
-type RemoveOfacCompanyWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-RemoveOfacCompanyWatch Remove company watch
-Delete a company ID watch.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param companyID Company ID
- * @param watchID Watch ID, used to identify a specific watch
- * @param optional nil or *RemoveOfacCompanyWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-*/
-func (a *WatchmanApiService) RemoveOfacCompanyWatch(ctx _context.Context, companyID string, watchID string, localVarOptionals *RemoveOfacCompanyWatchOpts) (*_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodDelete
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/companies/{companyID}/watch/{watchID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"companyID"+"}", _neturl.QueryEscape(parameterToString(companyID, "")), -1)
-
-	localVarPath = strings.Replace(localVarPath, "{"+"watchID"+"}", _neturl.QueryEscape(parameterToString(watchID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarHTTPResponse, newErr
-	}
-
-	return localVarHTTPResponse, nil
-}
-
-// RemoveOfacCustomerNameWatchOpts Optional parameters for the method 'RemoveOfacCustomerNameWatch'
-type RemoveOfacCustomerNameWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-RemoveOfacCustomerNameWatch Remove customer watch
-Delete a customer name watch.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param watchID Watch ID, used to identify a specific watch
- * @param name Customer or Company name watch
- * @param optional nil or *RemoveOfacCustomerNameWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-*/
-func (a *WatchmanApiService) RemoveOfacCustomerNameWatch(ctx _context.Context, watchID string, name string, localVarOptionals *RemoveOfacCustomerNameWatchOpts) (*_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodDelete
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/customers/watch/{watchID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"watchID"+"}", _neturl.QueryEscape(parameterToString(watchID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	localVarQueryParams.Add("name", parameterToString(name, ""))
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarHTTPResponse, newErr
-	}
-
-	return localVarHTTPResponse, nil
-}
-
-// RemoveOfacCustomerWatchOpts Optional parameters for the method 'RemoveOfacCustomerWatch'
-type RemoveOfacCustomerWatchOpts struct {
-	XRequestID optional.String
-}
-
-/*
-RemoveOfacCustomerWatch Remove customer watch
-Delete a customer ID watch.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param customerID Customer ID
- * @param watchID Watch ID, used to identify a specific watch
- * @param optional nil or *RemoveOfacCustomerWatchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
-*/
-func (a *WatchmanApiService) RemoveOfacCustomerWatch(ctx _context.Context, customerID string, watchID string, localVarOptionals *RemoveOfacCustomerWatchOpts) (*_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodDelete
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/customers/{customerID}/watch/{watchID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"customerID"+"}", _neturl.QueryEscape(parameterToString(customerID, "")), -1)
-
-	localVarPath = strings.Replace(localVarPath, "{"+"watchID"+"}", _neturl.QueryEscape(parameterToString(watchID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
-		newErr := GenericOpenAPIError{
-			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
-		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarHTTPResponse, newErr
-	}
-
-	return localVarHTTPResponse, nil
-}
-
 // SearchOpts Optional parameters for the method 'Search'
 type SearchOpts struct {
 	XRequestID optional.String
@@ -1538,29 +497,30 @@ type SearchOpts struct {
 	Id         optional.String
 	MinMatch   optional.Float32
 	Limit      optional.Int32
-	SdnType    optional.String
+	SdnType    optional.Interface
 	Program    optional.String
 }
 
 /*
-Search Search SDNs
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param optional nil or *SearchOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
- * @param "Q" (optional.String) -  Search across Name, Alt Names, and SDN Address fields for all available sanctions lists. Entries may be returned in all response sub-objects.
- * @param "Name" (optional.String) -  Name which could correspond to an entry on the SDN, Denied Persons, Sectoral Sanctions Identifications, or BIS Entity List sanctions lists. Alt names are also searched.
- * @param "Address" (optional.String) -  Physical address which could correspond to a human on the SDN list. Only Address results will be returned.
- * @param "City" (optional.String) -  City name as desginated by SDN guidelines. Only Address results will be returned.
- * @param "State" (optional.String) -  State name as desginated by SDN guidelines. Only Address results will be returned.
- * @param "Providence" (optional.String) -  Providence name as desginated by SDN guidelines. Only Address results will be returned.
- * @param "Zip" (optional.String) -  Zip code as desginated by SDN guidelines. Only Address results will be returned.
- * @param "Country" (optional.String) -  Country name as desginated by SDN guidelines. Only Address results will be returned.
- * @param "AltName" (optional.String) -  Alternate name which could correspond to a human on the SDN list. Only Alt name results will be returned.
- * @param "Id" (optional.String) -  ID value often found in remarks property of an SDN. Takes the form of 'No. NNNNN' as an alphanumeric value.
- * @param "MinMatch" (optional.Float32) -  Match percentage that search query must obtain for results to be returned.
- * @param "Limit" (optional.Int32) -  Maximum results returned by a search. Results are sorted by their match percentage in decending order.
- * @param "SdnType" (optional.String) -  Optional filter to only return SDNs whose type case-insensitively matches.
- * @param "Program" (optional.String) -  Optional filter to only return SDNs whose program case-insensitively matches.
+Search Search
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param optional nil or *SearchOpts - Optional Parameters:
+  - @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+  - @param "Q" (optional.String) -  Search across Name, Alt Names, and SDN Address fields for all available sanctions lists. Entries may be returned in all response sub-objects.
+  - @param "Name" (optional.String) -  Name which could correspond to an entry on the SDN, Denied Persons, Sectoral Sanctions Identifications, or BIS Entity List sanctions lists. Alt names are also searched.
+  - @param "Address" (optional.String) -  Physical address which could correspond to a human on the SDN list. Only Address results will be returned.
+  - @param "City" (optional.String) -  City name as desginated by SDN guidelines. Only Address results will be returned.
+  - @param "State" (optional.String) -  State name as desginated by SDN guidelines. Only Address results will be returned.
+  - @param "Providence" (optional.String) -  Providence name as desginated by SDN guidelines. Only Address results will be returned.
+  - @param "Zip" (optional.String) -  Zip code as desginated by SDN guidelines. Only Address results will be returned.
+  - @param "Country" (optional.String) -  Country name as desginated by SDN guidelines. Only Address results will be returned.
+  - @param "AltName" (optional.String) -  Alternate name which could correspond to a human on the SDN list. Only Alt name results will be returned.
+  - @param "Id" (optional.String) -  ID value often found in remarks property of an SDN. Takes the form of 'No. NNNNN' as an alphanumeric value.
+  - @param "MinMatch" (optional.Float32) -  Match percentage that search query must obtain for results to be returned.
+  - @param "Limit" (optional.Int32) -  Maximum results returned by a search. Results are sorted by their match percentage in decending order.
+  - @param "SdnType" (optional.Interface of SdnType) -  Optional filter to only return SDNs whose type case-insensitively matches.
+  - @param "Program" (optional.String) -  Optional filter to only return SDNs whose program case-insensitively matches.
+
 @return Search
 */
 func (a *WatchmanApiService) Search(ctx _context.Context, localVarOptionals *SearchOpts) (Search, *_nethttp.Response, error) {
@@ -1686,41 +646,48 @@ func (a *WatchmanApiService) Search(ctx _context.Context, localVarOptionals *Sea
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-// UpdateOfacCompanyStatusOpts Optional parameters for the method 'UpdateOfacCompanyStatus'
-type UpdateOfacCompanyStatusOpts struct {
+// SearchUSCSLOpts Optional parameters for the method 'SearchUSCSL'
+type SearchUSCSLOpts struct {
 	XRequestID optional.String
-	XUserID    optional.String
+	Name       optional.String
+	Limit      optional.Int32
 }
 
 /*
-UpdateOfacCompanyStatus Update company
-Update a Company&#39;s sanction status to always block or always allow transactions.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param companyID Company ID
- * @param updateOfacCompanyStatus
- * @param optional nil or *UpdateOfacCompanyStatusOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
- * @param "XUserID" (optional.String) -  User ID used to perform this search
+SearchUSCSL Search US CSL
+Search the US Consolidated Screening List
+  - @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+  - @param optional nil or *SearchUSCSLOpts - Optional Parameters:
+  - @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
+  - @param "Name" (optional.String) -  Name which could correspond to an entry on the CSL
+  - @param "Limit" (optional.Int32) -  Maximum number of downloads to return sorted by their timestamp in decending order.
+
+@return Search
 */
-func (a *WatchmanApiService) UpdateOfacCompanyStatus(ctx _context.Context, companyID string, updateOfacCompanyStatus UpdateOfacCompanyStatus, localVarOptionals *UpdateOfacCompanyStatusOpts) (*_nethttp.Response, error) {
+func (a *WatchmanApiService) SearchUSCSL(ctx _context.Context, localVarOptionals *SearchUSCSLOpts) (Search, *_nethttp.Response, error) {
 	var (
-		localVarHTTPMethod   = _nethttp.MethodPut
+		localVarHTTPMethod   = _nethttp.MethodGet
 		localVarPostBody     interface{}
 		localVarFormFileName string
 		localVarFileName     string
 		localVarFileBytes    []byte
+		localVarReturnValue  Search
 	)
 
 	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/companies/{companyID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"companyID"+"}", _neturl.QueryEscape(parameterToString(companyID, "")), -1)
-
+	localVarPath := a.client.cfg.BasePath + "/search/us-csl"
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := _neturl.Values{}
 	localVarFormParams := _neturl.Values{}
 
+	if localVarOptionals != nil && localVarOptionals.Name.IsSet() {
+		localVarQueryParams.Add("name", parameterToString(localVarOptionals.Name.Value(), ""))
+	}
+	if localVarOptionals != nil && localVarOptionals.Limit.IsSet() {
+		localVarQueryParams.Add("limit", parameterToString(localVarOptionals.Limit.Value(), ""))
+	}
 	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
+	localVarHTTPContentTypes := []string{}
 
 	// set Content-Type header
 	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
@@ -1739,25 +706,20 @@ func (a *WatchmanApiService) UpdateOfacCompanyStatus(ctx _context.Context, compa
 	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
 		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
 	}
-	if localVarOptionals != nil && localVarOptionals.XUserID.IsSet() {
-		localVarHeaderParams["X-User-ID"] = parameterToString(localVarOptionals.XUserID.Value(), "")
-	}
-	// body params
-	localVarPostBody = &updateOfacCompanyStatus
 	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
 	if err != nil {
-		return nil, err
+		return localVarReturnValue, nil, err
 	}
 
 	localVarHTTPResponse, err := a.client.callAPI(r)
 	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
 	localVarHTTPResponse.Body.Close()
 	if err != nil {
-		return localVarHTTPResponse, err
+		return localVarReturnValue, localVarHTTPResponse, err
 	}
 
 	if localVarHTTPResponse.StatusCode >= 300 {
@@ -1770,106 +732,21 @@ func (a *WatchmanApiService) UpdateOfacCompanyStatus(ctx _context.Context, compa
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
+				return localVarReturnValue, localVarHTTPResponse, newErr
 			}
 			newErr.model = v
 		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
-}
-
-// UpdateOfacCustomerStatusOpts Optional parameters for the method 'UpdateOfacCustomerStatus'
-type UpdateOfacCustomerStatusOpts struct {
-	XRequestID optional.String
-	XUserID    optional.String
-}
-
-/*
-UpdateOfacCustomerStatus Update customer
-Update a Customer sanction status to always block or always allow transactions.
- * @param ctx _context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- * @param customerID Customer ID
- * @param updateOfacCustomerStatus
- * @param optional nil or *UpdateOfacCustomerStatusOpts - Optional Parameters:
- * @param "XRequestID" (optional.String) -  Optional Request ID allows application developer to trace requests through the system's logs
- * @param "XUserID" (optional.String) -  User ID used to perform this search
-*/
-func (a *WatchmanApiService) UpdateOfacCustomerStatus(ctx _context.Context, customerID string, updateOfacCustomerStatus UpdateOfacCustomerStatus, localVarOptionals *UpdateOfacCustomerStatusOpts) (*_nethttp.Response, error) {
-	var (
-		localVarHTTPMethod   = _nethttp.MethodPut
-		localVarPostBody     interface{}
-		localVarFormFileName string
-		localVarFileName     string
-		localVarFileBytes    []byte
-	)
-
-	// create path and map variables
-	localVarPath := a.client.cfg.BasePath + "/ofac/customers/{customerID}"
-	localVarPath = strings.Replace(localVarPath, "{"+"customerID"+"}", _neturl.QueryEscape(parameterToString(customerID, "")), -1)
-
-	localVarHeaderParams := make(map[string]string)
-	localVarQueryParams := _neturl.Values{}
-	localVarFormParams := _neturl.Values{}
-
-	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{"application/json"}
-
-	// set Content-Type header
-	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
-	if localVarHTTPContentType != "" {
-		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
-	}
-
-	// to determine the Accept header
-	localVarHTTPHeaderAccepts := []string{"application/json"}
-
-	// set Accept header
-	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
-	if localVarHTTPHeaderAccept != "" {
-		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
-	}
-	if localVarOptionals != nil && localVarOptionals.XRequestID.IsSet() {
-		localVarHeaderParams["X-Request-ID"] = parameterToString(localVarOptionals.XRequestID.Value(), "")
-	}
-	if localVarOptionals != nil && localVarOptionals.XUserID.IsSet() {
-		localVarHeaderParams["X-User-ID"] = parameterToString(localVarOptionals.XUserID.Value(), "")
-	}
-	// body params
-	localVarPostBody = &updateOfacCustomerStatus
-	r, err := a.client.prepareRequest(ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, localVarFormFileName, localVarFileName, localVarFileBytes)
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 	if err != nil {
-		return nil, err
-	}
-
-	localVarHTTPResponse, err := a.client.callAPI(r)
-	if err != nil || localVarHTTPResponse == nil {
-		return localVarHTTPResponse, err
-	}
-
-	localVarBody, err := _ioutil.ReadAll(localVarHTTPResponse.Body)
-	localVarHTTPResponse.Body.Close()
-	if err != nil {
-		return localVarHTTPResponse, err
-	}
-
-	if localVarHTTPResponse.StatusCode >= 300 {
 		newErr := GenericOpenAPIError{
 			body:  localVarBody,
-			error: localVarHTTPResponse.Status,
+			error: err.Error(),
 		}
-		if localVarHTTPResponse.StatusCode == 400 {
-			var v Error
-			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
-			if err != nil {
-				newErr.error = err.Error()
-				return localVarHTTPResponse, newErr
-			}
-			newErr.model = v
-		}
-		return localVarHTTPResponse, newErr
+		return localVarReturnValue, localVarHTTPResponse, newErr
 	}
 
-	return localVarHTTPResponse, nil
+	return localVarReturnValue, localVarHTTPResponse, nil
 }

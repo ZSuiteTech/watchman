@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	moovhttp "github.com/moov-io/base/http"
+	"github.com/moov-io/base/log"
 
-	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/metrics/prometheus"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 )

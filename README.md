@@ -33,15 +33,32 @@ Moov Watchman offers download, parse, and search functions over numerous trade s
 
 Lists included in search are:
 
-- US Treasury - Office of Foreign Assets Control (OFAC)
-  - [Specially Designated Nationals](https://home.treasury.gov/policy-issues/financial-sanctions/specially-designated-nationals-and-blocked-persons-list-sdn-human-readable-lists) (SDN)
+- US Treasury - Office of Foreign Assets Control
+  - [Specially Designated Nationals](https://home.treasury.gov/policy-issues/financial-sanctions/specially-designated-nationals-and-blocked-persons-list-sdn-human-readable-lists)
     - Includes SDN, SDN Alternative Names, SDN Addresses
-  - [Sectoral Sanctions Identifications](https://home.treasury.gov/policy-issues/financial-sanctions/consolidated-sanctions-list/sectoral-sanctions-identifications-ssi-list) (SSI)
-- US Department of Commerce - Bureau of Industry and Security (BIS)
-  - [Denied Persons List](https://bis.data.commerce.gov/dataset/Denied-Persons-List-with-Denied-US-Export-Privileg/xwtd-wd7a/data) (DPL)
-  - [Entity List](https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/entity-list) (EL)
+- [United States Consolidated Screening List](https://www.export.gov/article2?id=Consolidated-Screening-List)
+   - Department of Commerce – Bureau of Industry and Security
+      - [Denied Persons List](https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/denied-persons-list)
+      - [Unverified List](https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/unverified-list)
+      - [Entity List](https://www.bis.doc.gov/index.php/policy-guidance/lists-of-parties-of-concern/entity-list)
+   - Department of State – Bureau of International Security and Non-proliferation
+      - [Nonproliferation Sanctions](http://www.state.gov/t/isn/c15231.htm)
+   - Department of State – Directorate of Defense Trade Controls
+      - ITAR Debarred (DTC)
+   - Department of the Treasury – Office of Foreign Assets Control
+      - [Specially Designated Nationals List](https://ofac.treasury.gov/specially-designated-nationals-list-data-formats-data-schemas)
+      - [Foreign Sanctions Evaders List](https://ofac.treasury.gov/consolidated-sanctions-list-non-sdn-lists/foreign-sanctions-evaders-fse-list)
+      - [Sectoral Sanctions Identifications List](https://ofac.treasury.gov/consolidated-sanctions-list-non-sdn-lists/sectoral-sanctions-identifications-ssi-list)
+      - [Palestinian Legislative Council List](https://ofac.treasury.gov/consolidated-sanctions-list/non-sdn-palestinian-legislative-council-ns-plc-list)
+   - Department of the Treasury – Office of Foreign Assets Control
+      - [Sectoral Sanctions Identifications List](https://ofac.treasury.gov/consolidated-sanctions-list-non-sdn-lists/sectoral-sanctions-identifications-ssi-list)
+- [EU - Consolidated Sanctions List](https://data.europa.eu/data/datasets/consolidated-list-of-persons-groups-and-entities-subject-to-eu-financial-sanctions?locale=en)
+   - NOTE: it is recommended to [create your own europa.eu account](https://webgate.ec.europa.eu/cas/login) and then access the [EU Financial Sanctions Files](https://webgate.ec.europa.eu/fsd/fsf)
+      - Use the token described under the "Show settings for crawler/robot" section
+- [UK - OFSI Sactions List](https://www.gov.uk/government/publications/financial-sanctions-consolidated-list-of-targets/consolidated-list-of-targets#contents)
+- [UK - Sanctions List](https://www.gov.uk/government/publications/the-uk-sanctions-list) (Disabled by default)
 
-All United States and European Union companies are required to comply with various regulations and sanction lists (such as the US Patriot Act requiring compliance with the BIS Denied Persons List). Moov's primary usage for this project is with ACH origination in our [paygate](https://github.com/moov-io/paygate) project.
+All United States, UK and European Union companies are required to comply with various regulations and sanction lists (such as the US Patriot Act requiring compliance with the BIS Denied Persons List).
 
 ## Table of contents
 
@@ -66,13 +83,11 @@ Moov Watchman is actively used in multiple production environments. Please star 
 
 ## Usage
 
-The Watchman project implements an HTTP server and [Go library](https://pkg.go.dev/github.com/moov-io/watchman) for searching, parsing, and downloading lists. We also have an [example](https://pkg.go.dev/github.com/moov-io/watchman/examples) of the webhook service. Below, you can find a detailed list of features offered by Watchman:
+The Watchman project implements an HTTP server and [Go library](https://pkg.go.dev/github.com/moov-io/watchman) for searching, parsing, and downloading lists. Below, you can find a detailed list of features offered by Watchman:
 
-- Download OFAC, BIS Denied Persons List (DPL), and various other data sources on startup
+- Download OFAC, US/UK/EU CSL, BIS Denied Persons List (DPL), and various other data sources on startup
   - Admin endpoint to [manually refresh OFAC and DPL data](docs/runbook.md#force-data-refresh)
 - Index data for searches
-- Async searches and notifications (webhooks)
-- Manual overrides to mark a `Company` or `Customer` as `unsafe` (blocked) or `exception` (never blocked).
 - Library for OFAC and BIS DPL data to download and parse their custom files
 
 ### Docker
@@ -175,16 +190,28 @@ PONG
 |-----|-----|-----|
 | `DATA_REFRESH_INTERVAL` | Interval for data redownload and reparse. `off` disables this refreshing. | 12h |
 | `INITIAL_DATA_DIRECTORY` | Directory filepath with initial files to use instead of downloading. Periodic downloads will replace the initial files. | Empty |
+| `SEARCH_MAX_WORKERS` | Maximum number of goroutines used for search. | 1024 |
+| `ADJACENT_SIMILARITY_POSITIONS` | How many nearby words to search for highest max similarly score. | 3 |
 | `EXACT_MATCH_FAVORITISM` | Extra weighting assigned to exact matches. | 0.0 |
-| `WEBHOOK_BATCH_SIZE` | How many watches to read from database per batch of async searches. | 100 |
+| `DISABLE_PHONETIC_FILTERING` | Force scoring search terms against every indexed record. | `false` |
+| `LENGTH_DIFFERENCE_CUTOFF_FACTOR` | Minimum ratio for the length of two matching tokens, before they score is penalised. | 0.9       |
+| `LENGTH_DIFFERENCE_PENALTY_WEIGHT` | Weight of penalty applied to scores when two matching tokens have different lengths. | 0.3    |
+| `DIFFERENT_LETTER_PENALTY_WEIGHT` | Weight of penalty applied to scores when two matching tokens begin with different letters. | 0.9   |
+| `UNMATCHED_INDEX_TOKEN_WEIGHT` | Weight of penalty applied to scores when part of the indexed name isn't matched. | 0.15    |
+| `JARO_WINKLER_BOOST_THRESHOLD` | Jaro-Winkler boost threshold. | 0.7 |
+| `JARO_WINKLER_PREFIX_SIZE` | Jaro-Winkler prefix size. | 4 |
 | `LOG_FORMAT` | Format for logging lines to be written as. | Options: `json`, `plain` - Default: `plain` |
+| `LOG_LEVEL` | Level of logging to emit. | Options: `trace`, `info` - Default: `info` |
 | `BASE_PATH` | HTTP path to serve API and web UI from. | `/` |
 | `HTTP_BIND_ADDRESS` | Address to bind HTTP server on. This overrides the command-line flag `-http.addr`. | Default: `:8084` |
 | `HTTP_ADMIN_BIND_ADDRESS` | Address to bind admin HTTP server on. This overrides the command-line flag `-admin.addr`. | Default: `:9094` |
 | `HTTPS_CERT_FILE` | Filepath containing a certificate (or intermediate chain) to be served by the HTTP server. Requires all traffic be over secure HTTP. | Empty |
 | `HTTPS_KEY_FILE`  | Filepath of a private key matching the leaf certificate from `HTTPS_CERT_FILE`. | Empty |
-| `DATABASE_TYPE` | Which database option to use (Options: `sqlite`, `mysql`). | Default: `sqlite` |
+| `DISABLE_WEB_UI` | Skip serving and setup of the web UI. | Default: `false` |
 | `WEB_ROOT` | Directory to serve web UI from. | Default: `webui/` |
+| `WEBHOOK_MAX_WORKERS` | Maximum number of workers processing webhooks. | Default: 10 |
+| `DOWNLOAD_WEBHOOK_URL` | Optional webhook URL called when data downloads / refreshes occur. | Empty |
+| `DOWNLOAD_WEBHOOK_AUTH_TOKEN` | Optional `Authorization` header included on download webhooks. | Empty |
 
 #### List configurations
 
@@ -192,38 +219,23 @@ PONG
 |-----|-----|-----|
 | `OFAC_DOWNLOAD_TEMPLATE` | HTTP address for downloading raw OFAC files. | `https://www.treasury.gov/ofac/downloads/%s` |
 | `DPL_DOWNLOAD_TEMPLATE` | HTTP address for downloading the DPL. | `https://www.bis.doc.gov/dpl/%s` |
-| `CSL_DOWNLOAD_TEMPLATE` | HTTP address for downloading the Consolidated Screening List (CSL), which is a collection of US government sanctions lists. | `https://api.trade.gov/consolidated_screening_list/%s` |
+| `EU_CSL_DOWNLOAD_URL` | Use an alternate URL for downloading EU Consolidated Screening List | Subresource of `webgate.ec.europa.eu` |
+| `WITH_OFAC_LIST` | Download and parse the US OFAC List | Default: `true` |
+| `WITH_US_DPL_LIST` | Download and parse the US Denied Persons List (DPL) | Default: `true` |
+| `WITH_US_CSL_SANCTIONS_LIST` | Download and parse the US Consolidated Screening List | Default: `true` |
+| `WITH_EU_SCREENING_LIST` | Download and parse the EU Consolidated Screening List | Default: `true` |
+| `WITH_UK_CSL_SANCTIONS_LIST` | Download and parse the UK CSL Sanctions List on startup. | Default: `true` |
+| `UK_CSL_DOWNLOAD_URL` | Use an alternate URL for downloading UK Consolidated Screening List | Subresource of `www.gov.uk` |
+| `UK_SANCTIONS_LIST_URL` | Use an alternate URL for downloading UK Sanctions List | Subresource of `www.gov.uk` |
+| `WITH_UK_SANCTIONS_LIST` | Download and parse the UK Sanctions List on startup. | Default: `false` |
+| `US_CSL_DOWNLOAD_URL` | Use an alternate URL for downloading US Consolidated Screening List | Subresource of `api.trade.gov` |
+| `CSL_DOWNLOAD_TEMPLATE` | Same as `US_CSL_DOWNLOAD_URL` | |
 | `KEEP_STOPWORDS` | Boolean to keep stopwords in names. | `false` |
-| `DEBUG_NAME_PIPELINE` | Boolean to pring debug messages for each name (SDN, SSI) processing step. | `false` |
+| `DEBUG_NAME_PIPELINE` | Boolean to print debug messages for each name (SDN, SSI) processing step. | `false` |
 
-#### Storage
+##### Downloads
 
-Based on `DATABASE_TYPE`, the following environmental variables will be read to configure connections for a specific database.
-
-##### MySQL
-
-- `MYSQL_ADDRESS`: TCP address for connecting to the MySQL server. (example: `tcp(hostname:3306)`)
-- `MYSQL_DATABASE`: Name of database to connect into.
-- `MYSQL_PASSWORD`: Password of user account for authentication.
-- `MYSQL_USER`: Username used for authentication.
-
-Refer to the MySQL driver documentation for [connection parameters](https://github.com/go-sql-driver/mysql#dsn-data-source-name).
-
-- `MYSQL_TIMEOUT`: Timeout parameter specified on (DSN) data source name. (Default: `30s`)
-
-##### SQLite
-
-- `SQLITE_DB_PATH`: Local filepath location for the paygate SQLite database. (Default: `watchman.db`)
-
-Refer to the SQLite driver documentation for [connection parameters](https://github.com/mattn/go-sqlite3#connection-string).
-
-#### Webhook notifications
-
-When Watchman sends a [webhook](https://en.wikipedia.org/wiki/Webhook) to your application, the body will contain a JSON representation of the [Company](https://godoc.org/github.com/moov-io/watchman/client#OfacCompany) or [Customer](https://godoc.org/github.com/moov-io/watchman/client#OfacCustomer) model as the body to a POST request. You can see an [example in Go](examples/webhook/webhook.go).
-
-An `Authorization` header will also be sent with the `authToken` provided when setting up the watch. Clients should verify this token to ensure authenticated communicated.
-
-Webhook notifications are ran after the OFAC data is successfully refreshed, which is determined by the `DATA_REFRESH_INTERVAL` environmental variable.
+Moov Watchman supports sending a webhook (`POST` HTTP Request) when the underlying data is refreshed. The body will be the count of entities indexed for each list. The body will be in JSON format and the same schema as the manual data refresh endpoint.
 
 ##### Watching a specific customer or company by ID
 
@@ -240,8 +252,6 @@ Moov Watchman supports sending a webhook periodically with a free-form name of a
 - `last_data_refresh_count`: Count of records for a given sanction or entity list.
 - `match_percentages` A histogram which holds the match percentages with a label (`type`) of searches.
    - `type`: Can be address, q, remarksID, name, altName
-- `mysql_connections`: Number of MySQL connections and their statuses.
-- `sqlite_connections`: Number of SQLite connections and their statuses.
 
 ### Data persistence
 
@@ -249,20 +259,11 @@ By design, Watchman  **does not persist** (save) any data about the search queri
 
 ### Go library
 
-This project uses [Go Modules](https://github.com/golang/go/wiki/Modules) and uses Go v1.14 or higher. See [Golang's install instructions](https://golang.org/doc/install) for help setting up Go. You can download the source code and we offer [tagged and released versions](https://github.com/moov-io/watchman/releases/latest) as well. We highly recommend you use a tagged release for production.
-
-```
-$ git@github.com:moov-io/watchman.git
-
-# Pull down into the Go Module cache
-$ go get -u github.com/moov-io/watchman
-
-$ go doc github.com/moov-io/watchman/client Search
-```
+Watchman offers [several packages for usage as libraries](https://pkg.go.dev/github.com/moov-io/watchman/pkg).
 
 ### In-browser Watchman search
 
-Using our [in-browser utility](https://oss.moov.io/watchman/), you can instantly perform advanced Watchman searches. Simply fill search fields and generate a detailed report that includes match percentage, alternative names, effective/expiration dates, IDs, addresses, and other useful information. This tool is particularly useful for completing quick searches with the aid of a intutive interface.
+Using the [WebUI](https://moov-io.github.io/watchman/webui/), you can instantly perform advanced OFAC Watchman searches. Simply fill search fields and generate a detailed report that includes match percentage, alternative names, effective/expiration dates, IDs, addresses, and other useful information. This tool is particularly useful for completing quick searches with the aid of a intuitive interface.
 
 ## Reporting blocks to OFAC
 
@@ -299,7 +300,7 @@ Note: 32-bit platforms have known issues and are not supported.
 
 Yes please! Please review our [Contributing guide](CONTRIBUTING.md) and [Code of Conduct](https://github.com/moov-io/ach/blob/master/CODE_OF_CONDUCT.md) to get started! Checkout our [issues for first time contributors](https://github.com/moov-io/watchman/contribute) for something to help out with.
 
-This project uses [Go Modules](https://github.com/golang/go/wiki/Modules) and uses Go 1.14 or higher. See [Golang's install instructions](https://golang.org/doc/install) for help setting up Go. You can download the source code and we offer [tagged and released versions](https://github.com/moov-io/watchman/releases/latest) as well. We highly recommend you use a tagged release for production.
+Run `make install` to setup [gopostal](https://github.com/openvenues/gopostal) / [libpostal](https://github.com/openvenues/libpostal) for Watchman.
 
 ### Releasing
 

@@ -8,6 +8,8 @@
 # Test binary, build with `go test -c`
 *.test
 
+.DS_Store
+
 # Output of the go coverage tool, specifically when used with LiteIDE
 coverage.html
 coverage.txt
@@ -15,6 +17,7 @@ coverage.txt
 
 /bin/
 /lint-project.sh
+/gitleaks.tar.gz
 misspell*
 staticcheck*
 
@@ -25,6 +28,9 @@ openapi-generator*jar
 
 *.db
 
+/libpostal/
+
 webui/build/
 webui/node_modules/
-release_url/
+
+makefile.dev

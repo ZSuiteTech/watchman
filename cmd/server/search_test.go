@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -10,30 +10,51 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 
-	"github.com/go-kit/kit/log"
-	"github.com/moov-io/watchman/pkg/csl"
+	"github.com/moov-io/base/log"
+	"github.com/moov-io/watchman/internal/prepare"
+	"github.com/moov-io/watchman/pkg/csl_eu"
+	"github.com/moov-io/watchman/pkg/csl_uk"
+	"github.com/moov-io/watchman/pkg/csl_us"
 	"github.com/moov-io/watchman/pkg/dpl"
 	"github.com/moov-io/watchman/pkg/ofac"
+
+	"github.com/stretchr/testify/require"
 )
 
 var (
 	// Live Searcher
 	testLiveSearcher  = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
-	testSearcherStats *downloadStats
+	testSearcherStats *DownloadStats
 	testSearcherOnce  sync.Once
 
+	noLogPipeliner = prepare.NewPipeliner(log.NewNopLogger(), false)
+
 	// Mock Searchers
-	addressSearcher   = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
-	altSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
-	sdnSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
-	idSearcher        = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
-	dplSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
-	ssiSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	addressSearcher = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	altSearcher     = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	sdnSearcher     = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	idSearcher      = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	dplSearcher     = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+
+	// CSL Searchers
 	bisEntitySearcher = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	meuSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	ssiSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	isnSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	uvlSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	fseSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	plcSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	capSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	dtcSearcher       = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	cmicSearcher      = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	ns_mbsSearcher    = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+
+	eu_cslSearcher           = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	uk_cslSearcher           = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
+	uk_sanctionsListSearcher = newSearcher(log.NewNopLogger(), noLogPipeliner, 1)
 )
 
 func init() {
@@ -125,7 +146,7 @@ func init() {
 			FRCitation:     "67 F.R. 7354 2/19/02 66 F.R. 48998 9/25/01 62 F.R. 26471 5/14/97 62 F.R. 34688 6/27/97 62 F.R. 60063 11/6/97 63 F.R. 25817 5/11/98 63 F.R. 58707 11/2/98 64 F.R. 23049 4/29/99",
 		},
 	}, noLogPipeliner)
-	ssiSearcher.SSIs = precomputeSSIs([]*csl.SSI{
+	ssiSearcher.SSIs = precomputeCSLEntities[csl_us.SSI]([]*csl_us.SSI{
 		{
 			EntityID:       "18782",
 			Type:           "Entity",
@@ -151,7 +172,25 @@ func init() {
 			SourceInfoURL:  "http://bit.ly/1MLgou0",
 		},
 	}, noLogPipeliner)
-	bisEntitySearcher.BISEntities = precomputeBISEntities([]*csl.EL{
+	meuSearcher.MilitaryEndUsers = precomputeCSLEntities[csl_us.MEU]([]*csl_us.MEU{
+		{
+			EntityID:  "26744194bd9b5cbec49db6ee29a4b53c697c7420",
+			Name:      "AECC Aviation Power Co. Ltd.",
+			Addresses: "Xiujia Bay, Weiyong Dt, Xian, 710021, CN",
+			FRNotice:  "85 FR 83799",
+			StartDate: "2020-12-23",
+			EndDate:   "",
+		},
+		{
+			EntityID:  "d54346ef81802673c1b1daeb2ca8bd5d13755abd",
+			Name:      "AECC China Gas Turbine Establishment",
+			Addresses: "No. 1 Hangkong Road, Mianyang, Sichuan, CN",
+			FRNotice:  "85 FR 83799",
+			StartDate: "2020-12-23",
+			EndDate:   "",
+		},
+	}, noLogPipeliner)
+	bisEntitySearcher.BISEntities = precomputeCSLEntities[csl_us.EL]([]*csl_us.EL{
 		{
 			Name:               "Mohammad Jan Khan Mangal",
 			AlternateNames:     []string{"Air I"},
@@ -175,9 +214,166 @@ func init() {
 			SourceInfoURL:      "http://bit.ly/1L47xrV",
 		},
 	}, noLogPipeliner)
+	isnSearcher.ISNs = precomputeCSLEntities[csl_us.ISN]([]*csl_us.ISN{
+		{
+			EntityID:              "2d2db09c686e4829d0ef1b0b04145eec3d42cd88",
+			Programs:              []string{"E.O. 13382", "Export-Import Bank Act", "Nuclear Proliferation Prevention Act"},
+			Name:                  "Abdul Qadeer Khan",
+			FederalRegisterNotice: "Vol. 74, No. 11, 01/16/09",
+			StartDate:             "2009-01-09",
+			Remarks:               []string{"Associated with the A.Q. Khan Network"},
+			SourceListURL:         "http://bit.ly/1NuVFxV",
+			AlternateNames:        []string{"ZAMAN", "Haydar"},
+			SourceInfoURL:         "http://bit.ly/1NuVFxV",
+		},
+	}, noLogPipeliner)
+	uvlSearcher.UVLs = precomputeCSLEntities[csl_us.UVL]([]*csl_us.UVL{
+		{
+			EntityID:      "f15fa805ff4ac5e09026f5e78011a1bb6b26dec2",
+			Name:          "Atlas Sanatgaran",
+			Addresses:     []string{"Komitas 26/114, Yerevan, Armenia, AM"},
+			SourceListURL: "http://bit.ly/1iwwTSJ",
+			SourceInfoURL: "http://bit.ly/1Qi4R7Z",
+		},
+	}, noLogPipeliner)
+	fseSearcher.FSEs = precomputeCSLEntities[csl_us.FSE]([]*csl_us.FSE{
+		{
+			EntityID:      "17526",
+			EntityNumber:  "17526",
+			Type:          "Individual",
+			Programs:      []string{"SYRIA", "FSE-SY"},
+			Name:          "BEKTAS, Halis",
+			Addresses:     nil,
+			SourceListURL: "https://bit.ly/1QWTIfE",
+			Citizenships:  "CH",
+			DatesOfBirth:  "1966-02-13",
+			SourceInfoURL: "http://bit.ly/1N1docf",
+			IDs:           []string{"CH, X0906223, Passport"},
+		},
+	}, noLogPipeliner)
+	plcSearcher.PLCs = precomputeCSLEntities[csl_us.PLC]([]*csl_us.PLC{
+		{
+			EntityID:       "9702",
+			EntityNumber:   "9702",
+			Type:           "Individual",
+			Programs:       []string{"NS-PLC", "Office of Misinformation"},
+			Name:           "SALAMEH, Salem",
+			Addresses:      []string{"123 Dunbar Street, Testerville, TX, Palestine"},
+			Remarks:        "HAMAS - Der al-Balah",
+			SourceListURL:  "https://bit.ly/1QWTIfE",
+			AlternateNames: []string{"SALAMEH, Salem Ahmad Abdel Hadi"},
+			DatesOfBirth:   "1951",
+			PlacesOfBirth:  "",
+			SourceInfoURL:  "http://bit.ly/2tjOLpx",
+		},
+	}, noLogPipeliner)
+	capSearcher.CAPs = precomputeCSLEntities[csl_us.CAP]([]*csl_us.CAP{
+		{
+			EntityID:      "20002",
+			EntityNumber:  "20002",
+			Type:          "Entity",
+			Programs:      []string{"UKRAINE-EO13662", "RUSSIA-EO14024"},
+			Name:          "BM BANK PUBLIC JOINT STOCK COMPANY",
+			Addresses:     []string{"Bld 3 8/15, Rozhdestvenka St., Moscow, 107996, RU"},
+			Remarks:       []string{"All offices worldwide", "for more information on directives, please visit the following link: https://www.treasury.gov/resource-center/sanctions/Programs/Pages/ukraine.aspx#directives", "(Linked To: VTB BANK PUBLIC JOINT STOCK COMPANY)"},
+			SourceListURL: "",
+			AlternateNames: []string{"BM BANK JSC", "BM BANK AO", "AKTSIONERNOE OBSHCHESTVO BM BANK",
+				"PAO BM BANK", "BANK MOSKVY PAO", "BANK OF MOSCOW",
+				"AKTSIONERNY KOMMERCHESKI BANK BANK MOSKVY OTKRYTOE AKTSIONERNOE OBSCHCHESTVO",
+				"JOINT STOCK COMMERCIAL BANK - BANK OF MOSCOW OPEN JOINT STOCK COMPANY"},
+			SourceInfoURL: "http://bit.ly/2PqohAD",
+			IDs: []string{"RU, 1027700159497, Registration Number",
+				"RU, 29292940, Government Gazette Number",
+				"MOSWRUMM, SWIFT/BIC",
+				"www.bm.ru, Website",
+				"Subject to Directive 1, Executive Order 13662 Directive Determination -",
+				"044525219, BIK (RU)",
+				"Financial Institution, Target Type"},
+		},
+	}, noLogPipeliner)
+	dtcSearcher.DTCs = precomputeCSLEntities[csl_us.DTC]([]*csl_us.DTC{
+		{
+			EntityID:              "d44d88d0265d93927b9ff1c13bbbb7c7db64142c",
+			Name:                  "Yasmin Ahmed",
+			FederalRegisterNotice: "69 FR 17468",
+			SourceListURL:         "http://bit.ly/307FuRQ",
+			AlternateNames:        []string{"Yasmin Tariq", "Fatimah Mohammad"},
+			SourceInfoURL:         "http://bit.ly/307FuRQ",
+		},
+	}, noLogPipeliner)
+	cmicSearcher.CMICs = precomputeCSLEntities[csl_us.CMIC]([]*csl_us.CMIC{
+		{
+			EntityID:       "32091",
+			EntityNumber:   "32091",
+			Type:           "Entity",
+			Programs:       []string{"CMIC-EO13959"},
+			Name:           "PROVEN HONOUR CAPITAL LIMITED",
+			Addresses:      []string{"C/O Vistra Corporate Services Centre, Wickhams Cay II, Road Town, VG1110, VG"},
+			Remarks:        []string{"(Linked To: HUAWEI INVESTMENT & HOLDING CO., LTD.)"},
+			SourceListURL:  "https://bit.ly/1QWTIfE",
+			AlternateNames: []string{"PROVEN HONOUR CAPITAL LTD", "PROVEN HONOUR"},
+			SourceInfoURL:  "https://bit.ly/3zsMQ4n",
+			IDs: []string{"Proven Honour Capital Ltd, Issuer Name", "Proven Honour Capital Limited, Issuer Name", "XS1233275194, ISIN",
+				"HK0000216777, ISIN", "Private Company, Target Type", "XS1401816761, ISIN", "HK0000111952, ISIN", "03 Jun 2021, Listing Date (CMIC)",
+				"02 Aug 2021, Effective Date (CMIC)", "03 Jun 2022, Purchase/Sales For Divestment Date (CMIC)"},
+		},
+	}, noLogPipeliner)
+	ns_mbsSearcher.NS_MBSs = precomputeCSLEntities[csl_us.NS_MBS]([]*csl_us.NS_MBS{
+		{
+			EntityID:       "17016",
+			EntityNumber:   "17016",
+			Type:           "Entity",
+			Programs:       []string{"UKRAINE-EO13662", "MBS"},
+			Name:           "GAZPROMBANK JOINT STOCK COMPANY",
+			Addresses:      []string{"16 Nametkina Street, Bldg. 1, Moscow, 117420, RU"},
+			Remarks:        []string{"For more information on directives, please visit the following link: http://www.treasury.gov/resource-center/sanctions/Programs/Pages/ukraine.aspx#directives."},
+			AlternateNames: []string{"GAZPROMBANK OPEN JOINT STOCK COMPANY", "BANK GPB JSC", "GAZPROMBANK AO", "JOINT STOCK BANK OF THE GAS INDUSTRY GAZPROMBANK"},
+			SourceInfoURL:  "https://bit.ly/2MbsybU",
+			IDs: []string{"RU, 1027700167110, Registration Number", "RU, 09807684, Government Gazette Number", "RU, 7744001497, Tax ID No.",
+				"www.gazprombank.ru, Website", "GAZPRUMM, SWIFT/BIC", "Subject to Directive 1, Executive Order 13662 Directive Determination -",
+				"Subject to Directive 3 - All transactions in, provision of financing for, and other dealings in new debt of longer than 14 days maturity or new equity where such new debt or new equity is issued on or after the 'Effective Date (EO 14024 Directive)' associated with this name are prohibited., Executive Order 14024 Directive Information",
+				"31 Jul 1990, Organization Established Date", "24 Feb 2022, Listing Date (EO 14024 Directive 3):", "26 Mar 2022, Effective Date (EO 14024 Directive 3):",
+				"For more information on directives, please visit the following link: https://home.treasury.gov/policy-issues/financial-sanctions/sanctions-programs-and-country-information/russian-harmful-foreign-activities-sanctions#directives, Executive Order 14024 Directive Information -"},
+		},
+	}, noLogPipeliner)
+
+	eu_cslSearcher.EUCSL = precomputeCSLEntities[csl_eu.CSLRecord]([]*csl_eu.CSLRecord{{
+		FileGenerationDate:         "28/10/2022",
+		EntityLogicalID:            13,
+		EntityRemark:               "(UNSC RESOLUTION 1483)",
+		EntitySubjectType:          "person",
+		EntityPublicationURL:       "http://eur-lex.europa.eu/LexUriServ/LexUriServ.do?uri=OJ:L:2003:169:0006:0023:EN:PDF",
+		EntityReferenceNumber:      "",
+		NameAliasWholeNames:        []string{"Saddam Hussein Al-Tikriti", "Abu Ali", "Abou Ali"},
+		AddressCities:              []string{"test city"},
+		AddressStreets:             []string{"test street"},
+		AddressPoBoxes:             []string{"test po box"},
+		AddressZipCodes:            []string{"test zip"},
+		AddressCountryDescriptions: []string{"test country"},
+		BirthDates:                 []string{"1937-04-28"},
+		BirthCities:                []string{"al-Awja, near Tikrit"},
+		BirthCountries:             []string{"IRAQ"},
+		ValidFromTo:                map[string]string{"2022": "2030"},
+	}}, noLogPipeliner)
+
+	uk_cslSearcher.UKCSL = precomputeCSLEntities([]*csl_uk.CSLRecord{{
+		Names:     []string{"'ABD AL-NASIR"},
+		Addresses: []string{"Tall 'Afar"},
+		GroupType: "Individual",
+		GroupID:   13720,
+	}}, noLogPipeliner)
+
+	uk_sanctionsListSearcher.UKSanctionsList = precomputeCSLEntities([]*csl_uk.SanctionsListRecord{{
+		Names:     []string{"HAJI KHAIRULLAH HAJI SATTAR MONEY EXCHANGE"},
+		Addresses: []string{"Branch Office 2, Peshawar, Khyber Paktunkhwa Province, Pakistan"},
+		UniqueID:  "AFG0001",
+	}}, noLogPipeliner)
 }
 
-func createTestSearcher(t *testing.T) *searcher {
+func createTestSearcher(t testing.TB) *searcher {
+	t.Helper()
+	t.Setenv("WITH_UK_SANCTIONS_LIST", "false")
+
 	if testing.Short() {
 		t.Skip("-short enabled")
 	}
@@ -194,6 +390,7 @@ func createTestSearcher(t *testing.T) *searcher {
 }
 
 func createBenchmarkSearcher(b *testing.B) *searcher {
+	b.Helper()
 	testSearcherOnce.Do(func() {
 		stats, err := testLiveSearcher.refreshData(filepath.Join("..", "..", "test", "testdata", "bench"))
 		if err != nil {
@@ -201,105 +398,40 @@ func createBenchmarkSearcher(b *testing.B) *searcher {
 		}
 		testSearcherStats = stats
 	})
+	verifyDownloadStats(b)
 	return testLiveSearcher
 }
 
-func TestJaroWinkler(t *testing.T) {
-	cases := []struct {
-		s1, s2 string
-		match  float64
-	}{
-		{"wei, zhao", "wei, Zhao", 0.917},
-		{"WEI, Zhao", "WEI, Zhao", 1.0},
-		{"WEI Zhao", "WEI Zhao", 1.0},
-		{strings.ToLower("WEI Zhao"), precompute("WEI, Zhao"), 1.0},
-		// make sure jaroWinkler is communative
-		{"jane doe", "jan lahore", 0.721},
-		{"jan lahore", "jane doe", 0.776},
-		// real world case
-		{"john doe", "paul john", 0.764},
-		{"john doe", "john othername", 0.815},
-		// close match
-		{"jane doe", "jane doe2", 0.971},
-		// real-ish world examples
-		{"kalamity linden", "kala limited", 0.771},
-		{"kala limited", "kalamity linden", 0.795},
-		// examples used in demos / commonly
-		{"nicolas", "nicolas", 1.0},
-		{"nicolas moros maduro", "nicolas maduro", 0.91},
-		{"nicolas maduro", "nicolas moros maduro", 1.0},
-		// example cases
-		{"nicolas maduro", "nicolás maduro", 0.961},
-		{"nicolas maduro", precompute("nicolás maduro"), 1.0},
-		{"nicolas maduro", "nicolas maduro", 1.0},
-		{"maduro, nicolas", "maduro, nicolas", 1.0},
-		{"maduro moros, nicolas", "maduro moros, nicolas", 1.0},
-		{"maduro moros, nicolas", "nicolas maduro", 0.889},
-		{"nicolas maduro moros", "maduro", 0.722},
-		{"nicolas maduro moros", "nicolás maduro", 0.884},
-		{"nicolas, maduro moros", "maduro", 0.720},
-		{"nicolas, maduro moros", "nicolas maduro", 0.902},
-		{"nicolas, maduro moros", "nicolás", 0.627},
-		{"nicolas, maduro moros", "maduro", 0.720},
-		{"nicolas, maduro moros", "nicolás maduro", 0.877},
-		{"africada financial services bureau change", "skylight", 0.352},
-		{"africada financial services bureau change", "skylight financial inc", 0.72},
-		{"africada financial services bureau change", "skylight services inc", 0.806},
-		{"africada financial services bureau change", "skylight financial services", 0.887},
-		{"africada financial services bureau change", "skylight financial services inc", 0.79},
+func verifyDownloadStats(b *testing.B) {
+	b.Helper()
 
-		// stopwords tests
-		{"the group for the preservation of the holy sites", "the bridgespan group", 1.00},
-		{precompute("the group for the preservation of the holy sites"), precompute("the bridgespan group"), 1.00},
-		{"group preservation holy sites", "bridgespan group", 0.689},
-		{"the group for the preservation of the holy sites", "the logan group", 1.00},
-		{precompute("the group for the preservation of the holy sites"), precompute("the logan group"), 1.00},
-		{"group preservation holy sites", "logan group", 0.478},
-		{"the group for the preservation of the holy sites", "the anything group", 1.00},
-		{precompute("the group for the preservation of the holy sites"), precompute("the anything group"), 1.00},
-		{"group preservation holy sites", "anything group", 0.617},
-		{"the group for the preservation of the holy sites", "the hello world group", 1.00},
-		{precompute("the group for the preservation of the holy sites"), precompute("the hello world group"), 1.00},
-		{"group preservation holy sites", "hello world group", 0.687},
-		{"the group for the preservation of the holy sites", "the group", 0.67},
-		{precompute("the group for the preservation of the holy sites"), precompute("the group"), 0.67},
-		{"group preservation holy sites", "group", 0.460},
-		{"the group for the preservation of the holy sites", "The flibbity jibbity flobbity jobbity grobbity zobbity group", 0.699},
-		{precompute("the group for the preservation of the holy sites"), precompute("the flibbity jibbity flobbity jobbity grobbity zobbity group"), .783},
-		{"group preservation holy sites", "flibbity jibbity flobbity jobbity grobbity zobbity group", 0.590},
+	// OFAC
+	require.Greater(b, testSearcherStats.SDNs, 1)
+	require.Greater(b, testSearcherStats.Alts, 1)
+	require.Greater(b, testSearcherStats.Addresses, 1)
 
-		// precompute
-		{"i c sogo kenkyusho", precompute("A.I.C. SOGO KENKYUSHO"), 0.667},
-		{precompute("A.I.C. SOGO KENKYUSHO"), "sogo kenkyusho", 0.667},
-	}
-	for i := range cases {
-		v := cases[i]
-		// Only need to call chomp on s1, see jaroWinkler doc
-		eql(t, fmt.Sprintf("#%d %s vs %s", i, v.s1, v.s2), jaroWinkler(v.s1, v.s2), v.match)
-	}
-}
+	// BIS
+	require.Greater(b, testSearcherStats.DeniedPersons, 1)
 
-func TestJaroWinklerErr(t *testing.T) {
-	v := jaroWinkler("", "hello")
-	eql(t, "NaN #1", v, 0.0)
+	// CSL
+	require.Greater(b, testSearcherStats.BISEntities, 1)
+	require.Greater(b, testSearcherStats.MilitaryEndUsers, 1)
+	require.Greater(b, testSearcherStats.SectoralSanctions, 1)
+	require.Greater(b, testSearcherStats.Unverified, 1)
+	require.Greater(b, testSearcherStats.NonProliferationSanctions, 1)
+	require.Greater(b, testSearcherStats.ForeignSanctionsEvaders, 1)
+	require.Greater(b, testSearcherStats.PalestinianLegislativeCouncil, 1)
+	require.Greater(b, testSearcherStats.CAPTA, 1)
+	require.Greater(b, testSearcherStats.ITARDebarred, 1)
+	require.Greater(b, testSearcherStats.ChineseMilitaryIndustrialComplex, 1)
+	require.Greater(b, testSearcherStats.NonSDNMenuBasedSanctions, 1)
 
-	v = jaroWinkler("hello", "")
-	eql(t, "NaN #1", v, 0.0)
-}
-
-func eql(t *testing.T, desc string, x, y float64) {
-	t.Helper()
-	if math.IsNaN(x) || math.IsNaN(y) {
-		t.Fatalf("%s: x=%.2f y=%.2f", desc, x, y)
-	}
-	if math.Abs(x-y) > 0.01 {
-		t.Errorf("%s: %.3f != %.3f", desc, x, y)
-	}
-}
-
-func TestEql(t *testing.T) {
-	eql(t, "", 0.1, 0.1)
-	eql(t, "", 0.0001, 0.00002)
+	// EU - CSL
+	require.Greater(b, testSearcherStats.EUCSL, 1)
+	// UK - CSL
+	require.Greater(b, testSearcherStats.UKCSL, 1)
+	// UK - SanctionsList
+	require.Equal(b, 0, testSearcherStats.UKSanctionsList)
 }
 
 // TestSearch_liveData will download the real data and run searches against the corpus.
@@ -310,9 +442,11 @@ func TestSearch_liveData(t *testing.T) {
 		name  string
 		match float64 // top match %
 	}{
-		{"Nicolas MADURO", 0.932},
-		{"nicolas maduro", 0.932},
+		{"Nicolas MADURO", 0.958},
+		{"nicolas maduro", 0.958},
+		{"NICOLAS maduro", 0.958},
 	}
+
 	keeper := keepSDN(filterRequest{})
 	for i := range cases {
 		sdns := searcher.TopSDNs(1, 0.00, cases[i].name, keeper)
@@ -480,9 +614,7 @@ func TestSearch__TopSDNs(t *testing.T) {
 	if len(sdns) == 0 {
 		t.Fatal("empty SDNs")
 	}
-	if sdns[0].EntityID != "2676" {
-		t.Errorf("%#v", sdns[0].SDN)
-	}
+	require.Equal(t, "2676", sdns[0].EntityID)
 }
 
 func TestSearch__TopDPs(t *testing.T) {
@@ -493,62 +625,6 @@ func TestSearch__TopDPs(t *testing.T) {
 	// DPL doesn't have any entity IDs. Comparing expected address components instead
 	if dps[0].DeniedPerson.StreetAddress != "P.O. BOX 28360" || dps[0].DeniedPerson.City != "DUBAI" {
 		t.Errorf("%#v", dps[0].DeniedPerson)
-	}
-}
-
-func TestSearcher_TopSSIs(t *testing.T) {
-	ssis := ssiSearcher.TopSSIs(1, 0.00, "ROSOBORONEKSPORT")
-	if len(ssis) == 0 {
-		t.Fatal("empty SSIs")
-	}
-	if ssis[0].SectoralSanction.EntityID != "18782" {
-		t.Errorf("%#v", ssis[0].SectoralSanction)
-	}
-}
-
-func TestSearcher_TopSSIs_limit(t *testing.T) {
-	ssis := ssiSearcher.TopSSIs(2, 0.00, "SPECIALIZED DEPOSITORY")
-	if len(ssis) != 2 {
-		t.Fatalf("Expected 2 results, found %d", len(ssis))
-	}
-	if ssis[0].SectoralSanction.EntityID != "18736" {
-		t.Errorf("%#v", ssis[0].SectoralSanction)
-	}
-}
-
-func TestSearcher_TopSSIs_reportAltNameWeight(t *testing.T) {
-	ssis := ssiSearcher.TopSSIs(1, 0.00, "KENKYUSHO")
-	if len(ssis) == 0 {
-		t.Fatal("empty SSIs")
-	}
-	if ssis[0].SectoralSanction.EntityID != "18782" {
-		t.Errorf("%f - %#v", ssis[0].match, ssis[0].SectoralSanction)
-	}
-	if math.Abs(1.0-ssis[0].match) > 0.001 {
-		t.Errorf("Expected match=1.0 for alt names: %f - %#v", ssis[0].match, ssis[0].SectoralSanction)
-	}
-}
-
-func TestSearcher_TopBISEntities(t *testing.T) {
-	els := bisEntitySearcher.TopBISEntities(1, 0.00, "Khan")
-	if len(els) == 0 {
-		t.Fatal("empty ELs")
-	}
-	if els[0].Entity.Name != "Mohammad Jan Khan Mangal" {
-		t.Errorf("%#v", els[0].Entity)
-	}
-}
-
-func TestSearcher_TopBISEntities_AltName(t *testing.T) {
-	els := bisEntitySearcher.TopBISEntities(1, 0.00, "Luqman Sehreci.")
-	if len(els) == 0 {
-		t.Fatal("empty ELs")
-	}
-	if els[0].Entity.Name != "Luqman Yasin Yunus Shgragi" {
-		t.Errorf("%#v", els[0].Entity)
-	}
-	if math.Abs(1.0-els[0].match) > 0.001 {
-		t.Errorf("Expected match=1.0 for alt names: %f - %#v", els[0].match, els[0].Entity)
 	}
 }
 
@@ -647,4 +723,19 @@ func TestSearch__FindSDNsByRemarksID(t *testing.T) {
 	if len(sdns) != 0 {
 		t.Fatalf("sdns=%#v", sdns)
 	}
+}
+
+func eql(t *testing.T, desc string, x, y float64) {
+	t.Helper()
+	if math.IsNaN(x) || math.IsNaN(y) {
+		t.Fatalf("%s: x=%.2f y=%.2f", desc, x, y)
+	}
+	if math.Abs(x-y) > 0.01 {
+		t.Errorf("%s: %.3f != %.3f", desc, x, y)
+	}
+}
+
+func TestEql(t *testing.T) {
+	eql(t, "", 0.1, 0.1)
+	eql(t, "", 0.0001, 0.00002)
 }

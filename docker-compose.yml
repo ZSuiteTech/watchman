@@ -2,6 +2,9 @@ version: '3'
 services:
   watchman:
     image: moov/watchman:latest
+    build:
+      context: .
+      dockerfile: ./Dockerfile
     environment:
       INITIAL_DATA_DIRECTORY: /data/
     volumes:
@@ -9,3 +12,6 @@ services:
     ports:
       - "8084:8084"
       - "9094:9094"
+
+networks:
+  intranet: {}

@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/moov-io/watchman/pkg/csl"
+	"github.com/moov-io/base/log"
+	"github.com/moov-io/watchman/pkg/csl_us"
 	"github.com/moov-io/watchman/pkg/dpl"
 	"github.com/moov-io/watchman/pkg/ofac"
 
-	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
 )
@@ -30,13 +30,8 @@ func TestSearch__Address(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
-
-	if v := w.Body.String(); !strings.Contains(v, `"match":1`) {
-		t.Fatalf("%#v", v)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.88194`)
 
 	var wrapper struct {
 		Addresses []*ofac.Address `json:"addresses"`
@@ -71,13 +66,9 @@ func TestSearch__AddressCountry(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":1`)
 
-	if v := w.Body.String(); !strings.Contains(v, `"match":1`) {
-		t.Errorf("%#v", v)
-	}
 }
 
 func TestSearch__AddressMulti(t *testing.T) {
@@ -89,13 +80,9 @@ func TestSearch__AddressMulti(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.8847`)
 
-	if v := w.Body.String(); !strings.Contains(v, `"match":0.8847`) {
-		t.Errorf("%#v", v)
-	}
 }
 
 func TestSearch__AddressProvidence(t *testing.T) {
@@ -107,13 +94,9 @@ func TestSearch__AddressProvidence(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.923`)
 
-	if v := w.Body.String(); !strings.Contains(v, `"match":0.923`) {
-		t.Errorf("%#v", v)
-	}
 }
 
 func TestSearch__AddressCity(t *testing.T) {
@@ -125,13 +108,9 @@ func TestSearch__AddressCity(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.923`)
 
-	if v := w.Body.String(); !strings.Contains(v, `"match":0.923`) {
-		t.Errorf("%#v", v)
-	}
 }
 
 func TestSearch__AddressState(t *testing.T) {
@@ -143,13 +122,9 @@ func TestSearch__AddressState(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.923`)
 
-	if v := w.Body.String(); !strings.Contains(v, `"match":0.923`) {
-		t.Errorf("%#v", v)
-	}
 }
 
 func TestSearch__NameAndAddress(t *testing.T) {
@@ -255,34 +230,25 @@ func TestSearch__NameAndAltName(t *testing.T) {
 		SDNs              []*ofac.SDN               `json:"SDNs"`
 		AltNames          []*ofac.AlternateIdentity `json:"altNames"`
 		Addresses         []*ofac.Address           `json:"addresses"`
-		SectoralSanctions []*csl.SSI                `json:"sectoralSanctions"`
+		SectoralSanctions []*csl_us.SSI             `json:"sectoralSanctions"`
 		// BIS
-		DeniedPersons []*dpl.DPL `json:"deniedPersons"`
-		BISEntities   []*csl.EL  `json:"bisEntities"`
+		DeniedPersons []*dpl.DPL   `json:"deniedPersons"`
+		BISEntities   []*csl_us.EL `json:"bisEntities"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&wrapper); err != nil {
 		t.Fatal(err)
 	}
+
 	// OFAC
-	if wrapper.SDNs[0].EntityID != "2681" {
-		t.Errorf("%#v", wrapper.SDNs[0])
-	}
-	if wrapper.AltNames[0].EntityID != "4691" {
-		t.Errorf("%#v", wrapper.AltNames[0].EntityID)
-	}
-	if wrapper.Addresses[0].EntityID != "735" {
-		t.Errorf("%#v", wrapper.Addresses[0].EntityID)
-	}
-	if wrapper.SectoralSanctions[0].EntityID != "18782" {
-		t.Errorf("%#v", wrapper.SectoralSanctions[0].EntityID)
-	}
+	require.Equal(t, "2681", wrapper.SDNs[0].EntityID)
+	require.Equal(t, "HAWATMA, Nayif", wrapper.SDNs[0].SDNName)
+	require.Equal(t, "559", wrapper.AltNames[0].EntityID)
+	require.Equal(t, "735", wrapper.Addresses[0].EntityID)
+	require.Equal(t, "18736", wrapper.SectoralSanctions[0].EntityID)
+
 	// BIS
-	if wrapper.DeniedPersons[0].StreetAddress != "P.O. BOX 28360" {
-		t.Errorf("%#v", wrapper.DeniedPersons[0].StreetAddress)
-	}
-	if wrapper.BISEntities[0].Name != "Mohammad Jan Khan Mangal" {
-		t.Errorf("%#v", wrapper.BISEntities[0])
-	}
+	require.Equal(t, "P.O. BOX 28360", wrapper.DeniedPersons[0].StreetAddress)
+	require.Equal(t, "Mohammad Jan Khan Mangal", wrapper.BISEntities[0].Name)
 }
 
 func TestSearch__Name(t *testing.T) {
@@ -303,22 +269,18 @@ func TestSearch__Name(t *testing.T) {
 	router.ServeHTTP(w, req)
 	w.Flush()
 
-	if w.Code != http.StatusOK {
-		t.Errorf("bogus status code: %d", w.Code)
-	}
-
-	if v := w.Body.String(); !strings.Contains(v, `"match":1`) {
-		t.Error(v)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.95588`)
+	require.Contains(t, w.Body.String(), `"matchedName":"dr ayman al zawahiri"`)
 
 	var wrapper struct {
 		// OFAC
 		SDNs []*ofac.SDN               `json:"SDNs"`
 		Alts []*ofac.AlternateIdentity `json:"altNames"`
-		SSIs []*csl.SSI                `json:"sectoralSanctions"`
+		SSIs []*csl_us.SSI             `json:"sectoralSanctions"`
 		// BIS
-		DPs []*dpl.DPL `json:"deniedPersons"`
-		ELs []*csl.EL  `json:"bisEntities"`
+		DPs []*dpl.DPL   `json:"deniedPersons"`
+		ELs []*csl_us.EL `json:"bisEntities"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&wrapper); err != nil {
 		t.Fatal(err)
@@ -327,21 +289,13 @@ func TestSearch__Name(t *testing.T) {
 		t.Fatalf("SDNs=%d Alts=%d SSIs=%d DPs=%d ELs=%d",
 			len(wrapper.SDNs), len(wrapper.Alts), len(wrapper.SSIs), len(wrapper.DPs), len(wrapper.ELs))
 	}
-	if wrapper.SDNs[0].EntityID != "2676" {
-		t.Errorf("%#v", wrapper.SDNs[0])
-	}
-	if wrapper.Alts[0].EntityID != "4691" {
-		t.Errorf("%#v", wrapper.Alts[0])
-	}
-	if wrapper.SSIs[0].EntityID != "18782" {
-		t.Errorf("%#v", wrapper.SSIs[0])
-	}
-	if wrapper.DPs[0].Name != "AL NASER WINGS AIRLINES" {
-		t.Errorf("%#v", wrapper.DPs[0])
-	}
-	if wrapper.ELs[0].Name != "Luqman Yasin Yunus Shgragi" {
-		t.Errorf("%#v", wrapper.ELs[0])
-	}
+
+	require.Equal(t, "2676", wrapper.SDNs[0].EntityID)
+	require.Equal(t, "4691", wrapper.Alts[0].EntityID)
+
+	require.Equal(t, "18736", wrapper.SSIs[0].EntityID)
+	require.Equal(t, "AL NASER WINGS AIRLINES", wrapper.DPs[0].Name)
+	require.Equal(t, "Luqman Yasin Yunus Shgragi", wrapper.ELs[0].Name)
 }
 
 func TestSearch__AltName(t *testing.T) {
@@ -357,9 +311,9 @@ func TestSearch__AltName(t *testing.T) {
 		t.Errorf("bogus status code: %d", w.Code)
 	}
 
-	if v := w.Body.String(); !strings.Contains(v, `"match":0.5`) {
-		t.Error(v)
-	}
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Contains(t, w.Body.String(), `"match":0.98`)
+	require.Contains(t, w.Body.String(), `"matchedName":"i c sogo kenkyusho"`)
 
 	var wrapper struct {
 		Alts []*ofac.AlternateIdentity `json:"altNames"`

@@ -1,3 +1,295 @@
+## v0.31.0 (Released 2024-11-21)
+
+IMPROVEMENTS
+
+- feat: Add environment configuration to disable Web UI
+- feat: Add environment configuration to disable UK CSL download
+
+BUILD
+
+- build(deps): bump rexml from 3.3.6 to 3.3.9 in /docs
+
+## v0.30.0 (Released 2024-10-24)
+
+ADDITIONS
+
+Watchman now filters out indexed records based on the first character's phonetic match. This is helpful to eliminate most
+low scoring results and reduces CPU usage.
+
+You can force scoring search terms against every indexed record by setting `DISABLE_PHONETIC_FILTERING=yes`.
+
+## v0.29.2 (Released 2024-10-23)
+
+IMPROVEMENTS
+
+- cmd/server: only wrap pipeline steps with debugStep during debugging
+- cmd/server: pool x/text/transform.Transformer instances
+
+BUILD
+
+- build: update golang.org/x/text
+- cmd/server: reduce memory usage in benchmark setup
+
+## v0.29.1 (Released 2024-10-07)
+
+IMPROVEMENTS
+
+- feat: read WITH_EU_SCREENING_LIST as option to skip EU CSL list
+- feat: usaddress: add Similarity function
+- remove MySQL and sqlite dependencies, resolves #468
+- remove bloat not needed any more when we build with CGO_ENABLED=0
+- remove database from dependencies and build system
+
+BUILD
+
+- build(deps): bump body-parser and express in /webui
+- build(deps): bump braces from 3.0.2 to 3.0.3 in /webui
+- build(deps): bump ejs from 3.1.9 to 3.1.10 in /webui
+- build(deps): bump express from 4.18.2 to 4.19.2 in /webui
+- build(deps): bump follow-redirects from 1.15.4 to 1.15.6 in /webui
+- build(deps): bump google.golang.org/protobuf from 1.31.0 to 1.33.0
+- build(deps): bump micromatch from 4.0.5 to 4.0.8 in /webui
+- build(deps): bump rexml from 3.2.6 to 3.3.6 in /docs
+- build(deps): bump rollup from 2.79.1 to 2.79.2 in /webui
+- build(deps): bump webpack from 5.89.0 to 5.95.0 in /webui
+- build(deps): bump webpack-dev-middleware from 5.3.3 to 5.3.4 in /webui
+- build(deps): bump webrick from 1.8.1 to 1.8.2 in /docs
+- build(deps-dev): bump nokogiri from 1.16.2 to 1.16.5 in /docs
+- build: convert docker-compose to docker compose
+- build: switch from docker-compose
+- chore(deps): update dependency github-pages to v232
+- fix(deps): update dependency express to v4.19.2 [security]
+- fix(deps): update react monorepo to v18.3.1
+- fix(deps): updates `body-parser` from 1.20.2 to 1.20.3
+- fix(deps): updates `express` from 4.19.2 to 4.21.0
+
+## v0.28.2 (Released 2024-03-12)
+
+IMPROVEMENTS
+
+- fix: download all files if the initial dir does not exist
+
+## v0.28.1 (Released 2024-03-12)
+
+IMPROVEMENTS
+
+- fix: close and cleanup downloaded files after successful parsing
+
+BUILD
+
+- build(deps-dev): bump nokogiri from 1.13.10 to 1.16.2 in /docs
+- chore(deps): update dependency github-pages to v231
+
+## v0.28.0 (Released 2024-01-29)
+
+ADDITIONS
+
+- feat: add `/crypto` endpoint and extract digital currency addresses from OFAC
+- feat: add `SEARCH_MAX_WORKERS`
+
+IMPROVEMENTS
+
+- build: fix npm build for Openshift
+- build: force latest stable Go when building docker images
+- fix: accumulate SDN comments for merging overflow after all files are read
+- fix: allocate known-capacity arrays
+- fix: copy extended remarks from sdn_comments.csv
+- largest: improve performance, simplify insert step
+
+BUILD
+
+- build(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0
+
+## v0.27.0 (Released 2023-12-14)
+
+This release of Watchman includes additional improvements to the search match scores to [reduce false positives and increase true positive matches](https://github.com/moov-io/watchman/pull/524#issue-2031927107). A few of the specific improvements are:
+
+1. Compare tokens in the search to the index tokens
+   - i.e. "find matches for every search token" rather than "find match for every indexed token"
+   - Improves scores of searches that don't include "middle" names
+   - Prevents sanctioned names that are 1 word (HADI, EMMA, KAMILA) matching long searches
+   - Has a side-effect that short search terms will have more false positives. I think this is a good trade off as the sanction lists will always contain the full name, but the search might not
+2. Once a token has matched something, it can't match a different token
+   - This prevents names with repeated words having artificially high scores
+   - e.g. prevents any search containing "Vladimir" matching "VLADIMIROV, Vladimir Vladimirovich"
+3. Weights each word-score by the length of the word, relative to the search and indexed name
+   - This corrects for error that is introduced by splitting names into tokens and doing piecewise Jaro-Winkler scoring
+   - Combing word-scores using a simple average gives short words (like Li, Al) equal weight to much longer words
+   - The length-weighted scores are comparable to what you get by doing whole-name to whole-name Jaro-Winkler comparison
+4. Punishes word-scores when the matching tokens have significantly different length
+5. Punishes word-scores when the matching tokens start with different letters
+
+## v0.26.1 (Released 2023-11-20)
+
+This release of Watchman has removed Company/Customer models and Watches. They've been deprecated for a while and do not perform as users expect. Stay tuned for a future Moov OSS project integrating with Watchman for sanctions screening.
+
+IMPROVEMENTS
+
+- feat: return matchedName in non-OFAC results
+- search: apply more edge case logic to decrease bad scoring
+- search: return matchedName for OFAC SDNs, Alts, and DPL records
+- test: remove duplicate (and skipped) UK/EU CSL tests
+
+## v0.25.0 (Released 2023-11-15)
+
+This release of Watchman lowers most match percentages by comparing names better.
+
+IMPROVEMENTS
+
+- fix: close xml encoder
+- fix: panic cleanup from newer linter rules
+- cmd/server: only check adjacent terms for local jaro max score
+- cmd/server: read ADJACENT_SIMILARITY_POSITIONS env var
+- cmd/server: weight term score by length similarity
+
+BUILD
+
+- build: bump numerous javascript dependencies
+- build: update to Go 1.21
+- build: update to node 20
+- build: update Debian, Fedora, node, and Go base images
+
+## v0.24.2 (Released 2023-04-03)
+
+IMPROVEMENTS
+
+- fix: keep numbers during stopwords step
+- fix: stop setting level=error for info logs
+
+BUILD
+
+- bump golang.org/x/crypto to v0.6.0
+- bump golang.org/x/net from 0.6.0 to 0.7.0
+- build(deps): bump activesupport from 6.1.7.2 to 7.0.4.3 in /docs
+- build(deps): bump webpack from 5.75.0 to 5.76.1 in /webui
+
+## v0.24.1 (Released 2023-02-16)
+
+IMPROVEMENTS
+
+- fix: filter SDNs in async search rather than truncate
+
+BUILD
+
+- build: update Go dependencies
+- docs: bundle update
+- webui: npm audit fix
+
+## v0.24.0 (Released 2023-02-02)
+
+ADDITIONS
+
+- search: Add the EU Consolidated Screening List
+- search: Add the UK Consolidated Screening List
+
+IMPROVEMENTS
+
+- feat: log status after download
+- fix: guard around race condition in pkg/download
+- fix: cap match percentage
+
+BUILD
+
+- build: upgrade golang to 1.20
+- build: try using hashicorp-forge/go-test-split-action to speedup tests
+- build(deps): bump activesupport from 6.0.3.4 to 6.0.6.1 in /docs
+- build(deps): bump json5 from 1.0.1 to 1.0.2 in /webui
+- build(deps): bump loader-utils from 2.0.0 to 2.0.4 in /webui
+- build(deps): bump nokogiri from 1.13.6 to 1.13.9 in /docs
+
+## v0.23.1 (Released 2022-10-17)
+
+IMPROVEMENTS
+
+- api,client: add 'match' to CSL results
+- webui: update country list
+
+BUILD
+
+- build: require go1.19.1 in CI/CD
+- build: upgrade golang.org/x/text to v0.3.8
+
+## v0.23.0 (Released 2022-09-08)
+
+Watchman v0.23.0 adds the US Consolidated Screening List results to search queries. A new `/search/us-csl` endpoint has also been added to only search the CSL. See the [API docs for full details](https://moov-io.github.io/watchman/api/#get-/search/us-csl).
+
+Lists added in this release:
+- Capta List (CAP)
+- Foreign Sanctions Evaders (FSE)
+- ITAR Debarred (DTC)
+- Military End User (MEU) List
+- Non-SDN Chinese Military-Industrial Complex Companies List (CMIC)
+- Non-SDN Menu-Based Sanctions List (NS-MBS List)
+- Nonproliferation Sanctions (ISN)
+- Palestinian Legislative Council List (PLC)
+- Unverified List (UVL)
+
+IMPROVEMENTS
+
+- download: only return files which are found or downloaded, not entire directory
+- feat: add GET /search/us-csl endpoint
+- fix: refer to `LOG_LEVEL` env var for when to log about migrations
+
+BUILD
+
+- build: upgrade to Go 1.19
+- build: replace deprecated ioutil functions
+- build(deps): bump terser from 5.13.1 to 5.14.2 in /webui
+- chore(deps): update dependency tzinfo to v1.2.10 [security]
+- fix(deps): update module github.com/moov-io/base to v0.34.1
+
+## v0.22.0 (Released 2022-07-21)
+
+Watchman v0.22.0 has started to use Go 1.18 and its support for generic programming has helped us greatly clean up our code. We've also refreshed our [documentation website](https://moov-io.github.io/watchman/).
+
+ADDITIONS
+
+- cmd/server: add Military End User (MEU) results to search response
+- cmd/server: add an optional webhook to be notified of data downloads
+- cmd/server: read `WEBHOOK_MAX_WORKERS` to configure max webhook processors
+- csl: support extracting Military End User (MEU) List
+- feat: allow overrides to jaro-winkler parameters
+
+IMPROVEMENTS
+
+- cmd/server: dig into CSL entity types to precompute AlternateNames
+- cmd/server: generic function for CSL entity precompute step
+- docs: show sdnType examples in query params
+
+BUILD
+
+- build: update to Fedora 37 for OpenShift, node and react
+- build: update to Go 1.18, Node 16 and Debian versions
+- cmd/server: cleanup t.Error calls for better visibility
+- cmd/server: switch to an outside mysql container, remove dockertest
+- examples/webhook: update docker image to Go 1.18
+
+## v0.21.5 (Released 2022-04-04)
+
+BUILD
+
+- build(deps): bump lodash from 4.17.19 to 4.17.21 in /webui
+- build(deps): bump minimist from 1.2.5 to 1.2.6 in /webui
+- fix(deps): update module github.com/moov-io/base to v0.28.1
+- fix(deps): update react monorepo to v18
+
+## v0.21.4 (Released 2022-03-04)
+
+IMPROVEMENTS
+
+- all: update logging to moov-io/base using better structures and key/value pairs
+
+BUILD
+
+- Improve code coverage and fix errors form gosec
+- Upgrade to Go 1.17
+- Upgrade github.com/go-kit/kit to v0.12.0
+- Upgrade github.com/mattn/go-sqlite3 to v1.14.11
+- Upgrade github.com/moov-io/base to v0.27.5
+- Upgrade github.com/ory/dockertest/v3 to v3.8.1
+- Upgrade github.com/pariz/gountries to v0.1.5
+- Upgrade github.com/prometheus/client_golang to v1.12.1
+
 ## v0.21.3 (Released 2021-11-10)
 
 IMPROVEMENTS

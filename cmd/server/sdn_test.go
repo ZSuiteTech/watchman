@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -10,9 +10,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/moov-io/base/log"
 	"github.com/moov-io/watchman/pkg/ofac"
 
-	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 )
 

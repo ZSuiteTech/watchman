@@ -1,15 +1,19 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
 package main
 
-import "sync"
+import (
+	"slices"
+	"sync"
+)
 
 // item represents an arbitrary value with an associated weight
 type item struct {
-	value  interface{}
-	weight float64
+	matched string
+	value   interface{}
+	weight  float64
 }
 
 // newLargest returns a `largest` instance which can be used to track items with the highest weights
@@ -31,12 +35,12 @@ type largest struct {
 }
 
 func (xs *largest) add(it *item) {
-	xs.mu.Lock()
-	defer xs.mu.Unlock()
-
 	if it.weight < xs.minMatch {
 		return // skip item as it's below our threshold
 	}
+
+	xs.mu.Lock()
+	defer xs.mu.Unlock()
 
 	for i := range xs.items {
 		if xs.items[i] == nil {
@@ -44,10 +48,7 @@ func (xs *largest) add(it *item) {
 			break
 		}
 		if xs.items[i].weight < it.weight {
-			// insert at i, slide other items over
-			xs.items = append(xs.items, nil)
-			copy(xs.items[i+1:], xs.items[i:])
-			xs.items[i] = it
+			xs.items = slices.Insert(xs.items, i, it)
 			break
 		}
 	}

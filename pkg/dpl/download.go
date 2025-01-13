@@ -6,12 +6,11 @@ package dpl
 
 import (
 	"fmt"
+	"io"
 	"os"
-	"path/filepath"
 
+	"github.com/moov-io/base/log"
 	"github.com/moov-io/watchman/pkg/download"
-
-	"github.com/go-kit/kit/log"
 )
 
 var (
@@ -24,20 +23,11 @@ var (
 )
 
 // Download returns an array of absolute filepaths for files downloaded
-func Download(logger log.Logger, initialDir string) (string, error) {
+func Download(logger log.Logger, initialDir string) (map[string]io.ReadCloser, error) {
 	dl := download.New(logger, download.HTTPClient)
 
 	addrs := make(map[string]string)
 	addrs["dpl.txt"] = fmt.Sprintf(dplDownloadTemplate, "dpl.txt")
 
-	files, err := dl.GetFiles(initialDir, addrs)
-	if len(files) == 0 || err != nil {
-		return "", fmt.Errorf("dpl download: %v", err)
-	}
-	for i := range files {
-		if filepath.Base(files[i]) == "dpl.txt" {
-			return files[i], nil
-		}
-	}
-	return "", nil
+	return dl.GetFiles(initialDir, addrs)
 }

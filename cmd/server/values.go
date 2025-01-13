@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	moovhttp "github.com/moov-io/base/http"
+	"github.com/moov-io/base/log"
 
-	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 )
 
@@ -48,7 +48,7 @@ func (acc accumulator) add(value string) {
 }
 
 func (acc accumulator) getValues() []string {
-	var out []string
+	out := make([]string, 0, len(acc.values))
 	for _, v := range acc.values {
 		out = append(out, v)
 	}

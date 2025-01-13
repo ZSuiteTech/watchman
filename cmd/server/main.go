@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -22,10 +22,13 @@ import (
 	"github.com/moov-io/base/admin"
 	moovhttp "github.com/moov-io/base/http"
 	"github.com/moov-io/base/http/bind"
+	"github.com/moov-io/base/log"
 	"github.com/moov-io/watchman"
-	"github.com/moov-io/watchman/internal/database"
+	"github.com/moov-io/watchman/internal/prepare"
+	searchv2 "github.com/moov-io/watchman/internal/search"
+	"github.com/moov-io/watchman/pkg/ofac"
+	pubsearch "github.com/moov-io/watchman/pkg/search"
 
-	"github.com/go-kit/kit/log"
 	"github.com/gorilla/mux"
 )
 
@@ -51,14 +54,12 @@ func main() {
 		*flagLogFormat = v
 	}
 	if strings.ToLower(*flagLogFormat) == "json" {
-		logger = log.NewJSONLogger(os.Stderr)
+		logger = log.NewJSONLogger()
 	} else {
-		logger = log.NewLogfmtLogger(os.Stderr)
+		logger = log.NewDefaultLogger()
 	}
-	logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-	logger = log.With(logger, "caller", log.DefaultCaller)
 
-	logger.Log("startup", fmt.Sprintf("Starting watchman server version %s", watchman.Version))
+	logger.Logf("Starting watchman server version %s", watchman.Version)
 
 	// Channel for errors
 	errs := make(chan error)
@@ -67,18 +68,6 @@ func main() {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 		errs <- fmt.Errorf("signal: %v", <-c)
-	}()
-
-	// Setup database connection
-	db, err := database.New(logger, os.Getenv("DATABASE_TYPE"))
-	if err != nil {
-		logger.Log("main", fmt.Sprintf("database problem: %v", err))
-		os.Exit(1)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			logger.Log("main", err)
-		}
 	}()
 
 	// Setup business HTTP routes
@@ -107,13 +96,14 @@ func main() {
 			PreferServerCipherSuites: true,
 			MinVersion:               tls.VersionTLS12,
 		},
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writTimeout,
-		IdleTimeout:  idleTimeout,
+		ReadTimeout:       readTimeout,
+		ReadHeaderTimeout: readTimeout,
+		WriteTimeout:      writTimeout,
+		IdleTimeout:       idleTimeout,
 	}
 	shutdownServer := func() {
 		if err := serve.Shutdown(context.TODO()); err != nil {
-			logger.Log("shutdown", err)
+			logger.LogError(err)
 		}
 	}
 
@@ -123,77 +113,85 @@ func main() {
 	}
 
 	// Start Admin server (with Prometheus metrics)
-	adminServer := admin.NewServer(*adminAddr)
+	adminServer, err := admin.New(admin.Opts{
+		Addr: *adminAddr,
+	})
+	if err != nil {
+		errs <- fmt.Errorf("problem starting admin server: %v", err)
+	}
 	adminServer.AddVersionHandler(watchman.Version) // Setup 'GET /version'
 	go func() {
-		logger.Log("admin", fmt.Sprintf("listening on %s", adminServer.BindAddr()))
+		logger.Logf("listening on %s", adminServer.BindAddr())
 		if err := adminServer.Listen(); err != nil {
 			err = fmt.Errorf("problem starting admin http: %v", err)
-			logger.Log("admin", err)
+			logger.LogError(err)
 			errs <- fmt.Errorf("admin shutdown: %v", err)
 		}
 	}()
 	defer adminServer.Shutdown()
 
-	// Setup download repository
-	downloadRepo := &sqliteDownloadRepository{db, logger}
-	defer downloadRepo.close()
-
-	var pipeline *pipeliner
+	var pipeline *prepare.Pipeliner
 	if debug, err := strconv.ParseBool(os.Getenv("DEBUG_NAME_PIPELINE")); debug && err == nil {
-		pipeline = newPipeliner(logger)
+		pipeline = prepare.NewPipeliner(logger, true)
 	} else {
-		pipeline = newPipeliner(log.NewNopLogger())
+		pipeline = prepare.NewPipeliner(log.NewNopLogger(), false)
 	}
-	searcher := newSearcher(logger, pipeline, *flagWorkers)
 
-	// Add manual data refresh endpoint
-	adminServer.AddHandler(manualRefreshPath, manualRefreshHandler(logger, searcher, downloadRepo))
+	searchWorkers := readInt(os.Getenv("SEARCH_MAX_WORKERS"), *flagWorkers)
+	searcher := newSearcher(logger, pipeline, searchWorkers)
 
 	// Add debug routes
 	adminServer.AddHandler(debugSDNPath, debugSDNHandler(logger, searcher))
 
 	// Initial download of data
 	if stats, err := searcher.refreshData(os.Getenv("INITIAL_DATA_DIRECTORY")); err != nil {
-		logger.Log("main", fmt.Sprintf("ERROR: failed to download/parse initial data: %v", err))
+		logger.LogErrorf("ERROR: failed to download/parse initial data: %v", err)
 		os.Exit(1)
 	} else {
-		if err := downloadRepo.recordStats(stats); err != nil {
-			logger.Log("main", fmt.Sprintf("ERROR: failed to record download stats: %v", err))
-			os.Exit(1)
-		}
-		logger.Log(
-			"main", fmt.Sprintf("data refreshed %v ago", time.Since(stats.RefreshedAt)),
-			"SDNs", stats.SDNs, "AltNames", stats.Alts, "Addresses", stats.Addresses, "SSI", stats.SectoralSanctions,
-			"DPL", stats.DeniedPersons, "BISEntities", stats.BISEntities,
-		)
+		logger.Info().With(log.Fields{
+			"SDNs":             log.Int(stats.SDNs),
+			"AltNames":         log.Int(stats.Alts),
+			"Addresses":        log.Int(stats.Addresses),
+			"SSI":              log.Int(stats.SectoralSanctions),
+			"DPL":              log.Int(stats.DeniedPersons),
+			"BISEntities":      log.Int(stats.BISEntities),
+			"UVL":              log.Int(stats.Unverified),
+			"ISN":              log.Int(stats.NonProliferationSanctions),
+			"FSE":              log.Int(stats.ForeignSanctionsEvaders),
+			"PLC":              log.Int(stats.PalestinianLegislativeCouncil),
+			"CAP":              log.Int(stats.CAPTA),
+			"DTC":              log.Int(stats.ITARDebarred),
+			"CMIC":             log.Int(stats.ChineseMilitaryIndustrialComplex),
+			"NS_MBS":           log.Int(stats.NonSDNMenuBasedSanctions),
+			"EU_CSL":           log.Int(stats.EUCSL),
+			"UK_CSL":           log.Int(stats.UKCSL),
+			"UK_SanctionsList": log.Int(stats.UKSanctionsList),
+		}).Logf("data refreshed %v ago", time.Since(stats.RefreshedAt))
 	}
 
-	// Setup Watch and Webhook database wrapper
-	watchRepo := &sqliteWatchRepository{db, logger}
-	defer watchRepo.close()
-	webhookRepo := &sqliteWebhookRepository{db}
-	defer webhookRepo.close()
-
-	// Setup company / customer repositories
-	companyRepo := &sqliteCompanyRepository{db, logger}
-	defer companyRepo.close()
-	custRepo := &sqliteCustomerRepository{db, logger}
-	defer custRepo.close()
-
 	// Setup periodic download and re-search
-	updates := make(chan *downloadStats)
+	updates := make(chan *DownloadStats)
 	dataRefreshInterval = getDataRefreshInterval(logger, os.Getenv("DATA_REFRESH_INTERVAL"))
-	go searcher.periodicDataRefresh(dataRefreshInterval, downloadRepo, updates)
-	go searcher.spawnResearching(logger, companyRepo, custRepo, watchRepo, webhookRepo, updates)
+	go searcher.periodicDataRefresh(dataRefreshInterval, updates)
+	go handleDownloadStats(updates, func(stats *DownloadStats) {
+		callDownloadWebook(logger, stats)
+	})
+
+	// Add manual data refresh endpoint
+	adminServer.AddHandler(manualRefreshPath, manualRefreshHandler(logger, searcher, updates))
 
 	// Add searcher for HTTP routes
-	addCompanyRoutes(logger, router, searcher, companyRepo, watchRepo)
-	addCustomerRoutes(logger, router, searcher, custRepo, watchRepo)
 	addSDNRoutes(logger, router, searcher)
 	addSearchRoutes(logger, router, searcher)
-	addDownloadRoutes(logger, router, downloadRepo)
 	addValuesRoutes(logger, router, searcher)
+
+	var genericEntities []pubsearch.Entity[pubsearch.Value]
+
+	genericSDNs := generalizeOFACSDNs(searcher.SDNs, searcher.Addresses)
+	genericEntities = append(genericEntities, genericSDNs...)
+
+	v2SearchService := searchv2.NewService(logger, genericEntities)
+	addSearchV2Routes(logger, router, v2SearchService)
 
 	// Setup our web UI to be served as well
 	setupWebui(logger, router, *flagBasePath)
@@ -201,14 +199,14 @@ func main() {
 	// Start business logic HTTP server
 	go func() {
 		if certFile, keyFile := os.Getenv("HTTPS_CERT_FILE"), os.Getenv("HTTPS_KEY_FILE"); certFile != "" && keyFile != "" {
-			logger.Log("startup", fmt.Sprintf("binding to %s for secure HTTP server", *httpAddr))
+			logger.Logf("binding to %s for secure HTTP server", *httpAddr)
 			if err := serve.ListenAndServeTLS(certFile, keyFile); err != nil {
-				logger.Log("exit", fmt.Sprintf("https shutdown: %v", err))
+				logger.LogErrorf("https shutdown: %v", err)
 			}
 		} else {
-			logger.Log("startup", fmt.Sprintf("binding to %s for HTTP server", *httpAddr))
+			logger.Logf("binding to %s for HTTP server", *httpAddr)
 			if err := serve.ListenAndServe(); err != nil {
-				logger.Log("exit", fmt.Sprintf("http shutdown: %v", err))
+				logger.LogErrorf("http shutdown: %v", err)
 			}
 		}
 	}()
@@ -216,7 +214,7 @@ func main() {
 	// Block/Wait for an error
 	if err := <-errs; err != nil {
 		shutdownServer()
-		logger.Log("exit", fmt.Sprintf("final exit: %v", err))
+		logger.LogErrorf("final exit: %v", err)
 	}
 }
 
@@ -238,22 +236,82 @@ func getDataRefreshInterval(logger log.Logger, env string) time.Duration {
 			return 0 * time.Second
 		}
 		if dur, _ := time.ParseDuration(env); dur > 0 {
-			logger.Log("main", fmt.Sprintf("Setting data refresh interval to %v", dur))
+			logger.Logf("Setting data refresh interval to %v", dur)
 			return dur
 		}
 	}
-	logger.Log("main", fmt.Sprintf("Setting data refresh interval to %v (default)", dataRefreshInterval))
+	logger.Logf("Setting data refresh interval to %v (default)", dataRefreshInterval)
 	return dataRefreshInterval
 }
 
 func setupWebui(logger log.Logger, r *mux.Router, basePath string) {
+	var disableWebUI bool
+	if val, err := strconv.ParseBool(os.Getenv("DISABLE_WEB_UI")); err == nil {
+		disableWebUI = val
+	}
+
+	if disableWebUI {
+		logger.Log("Disabling webui")
+		return
+	}
+
 	dir := os.Getenv("WEB_ROOT")
 	if dir == "" {
 		dir = filepath.Join("webui", "build")
 	}
 	if _, err := os.Stat(dir); err != nil {
-		logger.Log("main", fmt.Sprintf("problem with webui=%s: %v", dir, err))
+		logger.Logf("problem with webui=%s: %v", dir, err)
 		os.Exit(1)
 	}
 	r.PathPrefix("/").Handler(http.StripPrefix(basePath, http.FileServer(http.Dir(dir))))
+}
+
+func handleDownloadStats(updates chan *DownloadStats, handle func(stats *DownloadStats)) {
+	for {
+		stats := <-updates
+		if stats != nil {
+			handle(stats)
+		}
+	}
+}
+
+func generalizeOFACSDNs(input []*SDN, ofacAddresses []*Address) []pubsearch.Entity[pubsearch.Value] {
+	var out []pubsearch.Entity[pubsearch.Value]
+	for _, sdn := range input {
+		if sdn.SDN == nil {
+			continue
+		}
+
+		var addresses []ofac.Address
+		for _, ofacAddr := range ofacAddresses {
+			if ofacAddr.Address == nil {
+				continue
+			}
+
+			if sdn.EntityID == ofacAddr.Address.EntityID {
+				addresses = append(addresses, *ofacAddr.Address)
+			}
+		}
+
+		entity := ofac.ToEntity(*sdn.SDN, addresses, nil, nil)
+		if len(entity.Addresses) > 0 && entity.Addresses[0].Line1 != "" {
+			out = append(out, entity)
+		}
+	}
+	return out
+}
+
+func addSearchV2Routes(logger log.Logger, r *mux.Router, service searchv2.Service) {
+	searchv2.NewController(logger, service).AppendRoutes(r)
+}
+
+func readInt(override string, value int) int {
+	if override != "" {
+		n, err := strconv.ParseInt(override, 10, 32)
+		if err != nil {
+			panic(fmt.Errorf("unable to parse %q as int", override)) //nolint:forbidigo
+		}
+		return int(n)
+	}
+	return value
 }

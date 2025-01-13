@@ -8,26 +8,28 @@ menubar: docs-menu
 
 # Search
 
-Moov Watchman offers numerous search options for inspecting the SDN and related data.
+Moov Watchman offers numerous search options for inspecting the OFAC, SDN, CSL, and other related data. Certain endpoints don't inspect all supported lists.
 
 ## Supported combinations
 
-- All fields
+- All fields, all lists
    - `?q=<string>`
-- Name search
+- Name search, Searches OFAC, SSI, DPs, and BIS Entities
    - `?name=<string>`
-   - An Address can be included
+   - An Address can be included, Only Searches the OFAC list
       - `address=<string>&city=<string>&state=<string>&providence=<string>&zip=<string>&country=<string>`
-- ID search
+- ID search, Only searches the OFAC list
    - `?id=<string>`
-- Alt Name search
+- Alt Name search, Only searches the OFAC list
    - `?altName=<string>`
-- Address search
+- Address search, Only searches the OFAC list
    - `&address=<string>&city=<string>&state=<string>&providence=<string>&zip=<string>&country=<string>`
 
 ## All in one
 
 The most common endpoint for searching across all data Watchman has indexed. To perform this search make an HTTP query like the following:
+
+See the [API documentation](https://moov-io.github.io/watchman/api/#get-/search) for full request/response data.
 
 ```
 curl 'http://localhost:8084/search?q=nicolas+maduro&limit=1'
@@ -268,5 +270,38 @@ curl 'http://localhost:8084/search?name=EP&sdnType=aircraft&limit=1&program=sdgt
   "altNames": null,
   "addresses": null,
   "deniedPersons": null
+}
+```
+
+## US Consolidated Screening List (CSL)
+
+Moov Watchman offers searching the entire US CSL list. The supported query parameters are:
+
+- `name`: Legal name of entity on list
+- `limit`: Maximum number of results to return
+
+Refer to the [API docs for searching US CSL](https://moov-io.github.io/watchman/api/#get-/search/us-csl) for more details.
+
+```
+curl "http://localhost:8084/search/us-csl?name=Al&limit=10
+```
+```
+{
+  "SDNs": null,
+  "altNames": null,
+  "addresses": null,
+  "deniedPersons": null,
+  "bisEntities": [ ... ],
+  "militaryEndUsers": [ ... ],
+  "sectoralSanctions": [ ... ],
+  "unverifiedCSL": [ ... ],
+  "nonproliferationSanctions": [ ... ],
+  "foreignSanctionsEvaders": [ ... ],
+  "palestinianLegislativeCouncil": [ ... ],
+  "captaList": [ ... ],
+  "itarDebarred": [ ... ],
+  "nonSDNChineseMilitaryIndustrialComplex": [ ... ],
+  "nonSDNMenuBasedSanctionsList": [ ... ],
+  "refreshedAt": "2022-09-07T20:35:35.773313Z"
 }
 ```

@@ -6,30 +6,30 @@ package ofac
 
 import (
 	"fmt"
+	"io"
 	"os"
 
+	"github.com/moov-io/base/log"
 	"github.com/moov-io/watchman/pkg/download"
-
-	"github.com/go-kit/kit/log"
 )
 
 var (
 	ofacFilenames = []string{
-		"add.csv",          // Address
-		"alt.csv",          // Alternate ID
-		"sdn.csv",          // Specially Designated National
-		"sdn_comments.csv", // Specially Designated National Comments
+		"ADD.CSV",          // Address
+		"ALT.CSV",          // Alternate ID
+		"SDN.CSV",          // Specially Designated National
+		"SDN_COMMENTS.CSV", // Specially Designated National Comments
 	}
 
 	ofacURLTemplate = func() string {
 		if v := os.Getenv("OFAC_DOWNLOAD_TEMPLATE"); v != "" {
 			return v
 		}
-		return "https://www.treasury.gov/ofac/downloads/%s"
+		return "https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/%s"
 	}()
 )
 
-func Download(logger log.Logger, initialDir string) ([]string, error) {
+func Download(logger log.Logger, initialDir string) (map[string]io.ReadCloser, error) {
 	dl := download.New(logger, download.HTTPClient)
 
 	addrs := make(map[string]string)

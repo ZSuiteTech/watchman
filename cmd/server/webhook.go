@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -6,19 +6,21 @@ package main
 
 import (
 	"bytes"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"time"
 
+	"github.com/moov-io/base/strx"
 	"go4.org/syncutil"
 )
 
 var (
 	// webhookGate is a goroutine-safe throttler designed to only allow N
 	// goroutines to run at any given time.
-	webhookGate = syncutil.NewGate(10)
+	webhookGate *syncutil.Gate
 
 	webhookHTTPClient = &http.Client{
 		Timeout: 10 * time.Second,
@@ -36,9 +38,16 @@ var (
 	}
 )
 
+func init() {
+	maxWorkers, err := strconv.ParseInt(strx.Or(os.Getenv("WEBHOOK_MAX_WORKERS"), "10"), 10, 32)
+	if err == nil {
+		webhookGate = syncutil.NewGate(int(maxWorkers))
+	}
+}
+
 // callWebhook will take `body` as JSON and make a POST request to the provided webhook url.
 // Returned is the HTTP status code.
-func callWebhook(watchID string, body *bytes.Buffer, webhook string, authToken string) (int, error) {
+func callWebhook(body *bytes.Buffer, webhook string, authToken string) (int, error) {
 	webhook, err := validateWebhook(webhook)
 	if err != nil {
 		return 0, err
@@ -47,22 +56,24 @@ func callWebhook(watchID string, body *bytes.Buffer, webhook string, authToken s
 	// Setup HTTP request
 	req, err := http.NewRequest("POST", webhook, body)
 	if err != nil {
-		return 0, fmt.Errorf("unknown error with watch %s: %v", watchID, err)
+		return 0, fmt.Errorf("unknown error webhook: %v", err)
 	}
 	if authToken != "" {
 		req.Header.Set("Authorization", authToken)
 	}
 
 	// Guard HTTP calls in-flight
-	webhookGate.Start()
-	defer webhookGate.Done()
+	if webhookGate != nil {
+		webhookGate.Start()
+		defer webhookGate.Done()
+	}
 
 	resp, err := webhookHTTPClient.Do(req)
 	if resp == nil || err != nil {
 		if resp == nil {
 			return 0, fmt.Errorf("unable to call webhook: %v", err)
 		}
-		return resp.StatusCode, fmt.Errorf("HTTP problem with watch %s: %v", watchID, err)
+		return resp.StatusCode, fmt.Errorf("HTTP problem with webhook %v", err)
 	}
 	if resp.Body != nil {
 		resp.Body.Close()
@@ -87,28 +98,4 @@ func validateWebhook(raw string) (string, error) {
 		return "", fmt.Errorf("%s is not an HTTPS url", u.String())
 	}
 	return u.String(), nil
-}
-
-type webhookRepository interface {
-	recordWebhook(watchID string, attemptedAt time.Time, status int) error
-}
-
-type sqliteWebhookRepository struct {
-	db *sql.DB
-}
-
-func (r *sqliteWebhookRepository) close() error {
-	return r.db.Close()
-}
-
-func (r *sqliteWebhookRepository) recordWebhook(watchID string, attemptedAt time.Time, status int) error {
-	query := `insert into webhook_stats (watch_id, attempted_at, status) values (?, ?, ?);`
-	stmt, err := r.db.Prepare(query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.Exec(watchID, attemptedAt, status)
-	return err
 }

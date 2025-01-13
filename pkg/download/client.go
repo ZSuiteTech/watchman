@@ -8,22 +8,21 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/moov-io/base/log"
 	"github.com/moov-io/watchman"
-
-	"github.com/go-kit/kit/log"
 )
 
 var (
 	HTTPClient = &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: 45 * time.Second,
 	}
 )
 
@@ -44,13 +43,12 @@ type Downloader struct {
 	Logger log.Logger
 }
 
-// GetFiles will download all provided files, return their filepaths, and store them in a
-// temporary directory and an error otherwise.
+// GetFiles will initiate download of all provided files, return an io.ReadCloser to their content
 //
 // initialDir is an optional filepath to look for files in before attempting to download.
 //
-// Callers are expected to cleanup the temp directory.
-func (dl *Downloader) GetFiles(initialDir string, namesAndSources map[string]string) ([]string, error) {
+// Callers are expected to call the io.Closer interface method when they are done with the file
+func (dl *Downloader) GetFiles(dir string, namesAndSources map[string]string) (map[string]io.ReadCloser, error) {
 	if dl == nil {
 		return nil, errors.New("nil Downloader")
 	}
@@ -62,89 +60,96 @@ func (dl *Downloader) GetFiles(initialDir string, namesAndSources map[string]str
 	}
 
 	// Check the initial directory for files we don't need to download
-	var dir string
-	if initialDir != "" {
-		dir = initialDir // empty, but use it as a directory
-	}
-	// Create a temporary directory for downloads if needed
-	if dir == "" {
-		temp, err := ioutil.TempDir("", "downloader")
-		if err != nil {
-			return nil, fmt.Errorf("downloader: unable to make temp dir: %v", err)
-		}
-		dir = temp
-	}
+	// do not treat an nonexisting directory as error
+	localFiles, _ := os.ReadDir(dir)
 
-	localFiles, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("readdir %s: %v", dir, err)
-	}
-
+	var mu sync.Mutex
+	out := make(map[string]io.ReadCloser)
 	var wg sync.WaitGroup
 	wg.Add(len(namesAndSources))
+
+findfiles:
 	for name, source := range namesAndSources {
 		// Check if we have the file locally first
-		found := false
-		for i := range localFiles {
-			if strings.EqualFold(filepath.Base(localFiles[i].Name()), name) {
-				found = true
-				break
+		for _, file := range localFiles {
+			if strings.EqualFold(filepath.Base(file.Name()), name) {
+				fn := filepath.Join(dir, file.Name())
+				fd, err := os.Open(fn)
+				if err != nil {
+					dl.Logger.Error().LogErrorf("could not read file from %v initialDir: %v", fn, err)
+					fd.Close()
+					continue
+				}
+				mu.Lock()
+				out[name] = fd
+				mu.Unlock()
+				// file is found, skip downloading
+				wg.Done()
+				continue findfiles
 			}
 		}
-		// Skip downloading this file since we found it
-		if found {
-			wg.Done()
-			continue
-		}
+
 		// Download missing files
 		go func(wg *sync.WaitGroup, filename, downloadURL string) {
 			defer wg.Done()
-			dl.retryDownload(dir, filename, downloadURL)
+
+			logger := dl.createLogger(filename, downloadURL)
+
+			startTime := time.Now().In(time.UTC)
+			content, err := dl.retryDownload(downloadURL)
+			dur := time.Now().In(time.UTC).Sub(startTime)
+
+			if err != nil {
+				logger.Error().LogErrorf("FAILURE after %v to download: %v", dur, err)
+				return
+			}
+
+			logger.Info().Logf("successful download after %v", dur)
+			mu.Lock()
+			out[filename] = content
+			mu.Unlock()
 		}(&wg, name, source)
 	}
-
 	wg.Wait()
 
-	// count files and error if the count isn't what we expected
-	fds, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, fmt.Errorf("problem reading data directory: %v", err)
-	}
-	var out []string
-	for i := range fds {
-		out = append(out, filepath.Join(dir, filepath.Base(fds[i].Name())))
-	}
 	return out, nil
 }
 
-func (dl *Downloader) retryDownload(dir, filename, downloadURL string) {
+func (dl *Downloader) createLogger(filename, downloadURL string) log.Logger {
+	var host string
+	u, _ := url.Parse(downloadURL)
+	if u != nil {
+		host = u.Host
+	}
+	return dl.Logger.With(log.Fields{
+		"host":     log.String(host),
+		"filename": log.String(filename),
+	})
+}
+
+func (dl *Downloader) retryDownload(downloadURL string) (io.ReadCloser, error) {
 	// Allow a couple retries for various sources (some are flakey)
 	for i := 0; i < 3; i++ {
-		req, err := http.NewRequest("GET", downloadURL, nil)
+		req, err := http.NewRequest(http.MethodGet, downloadURL, nil)
 		if err != nil {
-			dl.Logger.Log("download", fmt.Sprintf("error building HTTP request: %v", err))
-			return
+			return nil, dl.Logger.Error().LogErrorf("error building HTTP request: %v", err).Err()
 		}
 		req.Header.Set("User-Agent", fmt.Sprintf("moov-io/watchman:%v", watchman.Version))
+		// in order to get passed europes 406 (Not Accepted)
+		req.Header.Set("accept-language", "en-US,en;q=0.9")
 
 		resp, err := dl.HTTP.Do(req)
+
 		if err != nil {
+			dl.Logger.Error().LogErrorf("err while doing client request: %v", err)
 			time.Sleep(100 * time.Millisecond)
-			continue // retry
+			continue
 		}
-
-		// Copy resp.Body into a file in our temp dir
-		fd, err := os.Create(filepath.Join(dir, filename))
-		if err != nil {
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			resp.Body.Close()
-			return
+			continue
 		}
-
-		io.Copy(fd, resp.Body) // copy file contents
-
-		// close the open files
-		fd.Close()
-		resp.Body.Close()
-		return // quit after successful download
+		return resp.Body, nil
 	}
+	return nil, errors.New("error max retries reached while trying to obtain file")
 }

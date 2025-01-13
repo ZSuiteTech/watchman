@@ -1,4 +1,4 @@
-// Copyright 2020 The Moov Authors
+// Copyright 2022 The Moov Authors
 // Use of this source code is governed by an Apache License
 // license that can be found in the LICENSE file.
 
@@ -7,17 +7,17 @@ package main
 import (
 	"testing"
 
+	"github.com/moov-io/base/log"
+	"github.com/moov-io/watchman/internal/stringscore"
 	"github.com/moov-io/watchman/pkg/ofac"
-
-	"github.com/go-kit/kit/log"
 )
 
 func TestIssue115__TopSDNs(t *testing.T) {
-	score := jaroWinkler("georgehabbash", "georgebush")
-	eql(t, "george bush jaroWinkler", score, 0.896)
+	score := stringscore.JaroWinkler("georgehabbash", "georgebush")
+	eql(t, "george bush stringscore.JaroWinkler", score, 0.896)
 
-	score = jaroWinkler("g", "geoergebush")
-	eql(t, "g vs geoergebush", score, 0.697)
+	score = stringscore.JaroWinkler("g", "geoergebush")
+	eql(t, "g vs geoergebush", score, 0.070)
 
 	pipe := noLogPipeliner
 	s := newSearcher(log.NewNopLogger(), pipe, 1)
@@ -30,13 +30,13 @@ func TestIssue115__TopSDNs(t *testing.T) {
 	s.SDNs = precomputeSDNs([]*ofac.SDN{{EntityID: "2680", SDNName: "HABBASH, George", SDNType: "INDIVIDUAL"}}, nil, pipe)
 
 	out := s.TopSDNs(1, 0.00, "george bush", keeper)
-	eql(t, "issue115: top SDN 2680", out[0].match, 0.732)
+	eql(t, "issue115: top SDN 2680", out[0].match, 0.687)
 
 	// was 88.3% match
 	s.SDNs = precomputeSDNs([]*ofac.SDN{{EntityID: "9432", SDNName: "CHIWESHE, George", SDNType: "INDIVIDUAL"}}, nil, pipe)
 
 	out = s.TopSDNs(1, 0.00, "george bush", keeper)
-	eql(t, "issue115: top SDN 18996", out[0].match, 0.764)
+	eql(t, "issue115: top SDN 18996", out[0].match, 0.686)
 
 	// another example
 	s.SDNs = precomputeSDNs([]*ofac.SDN{{EntityID: "0", SDNName: "Bush, George W", SDNType: "INDIVIDUAL"}}, nil, pipe)
@@ -48,5 +48,5 @@ func TestIssue115__TopSDNs(t *testing.T) {
 	eql(t, "issue115: top SDN 0", out[0].match, 1.0)
 
 	out = s.TopSDNs(1, 0.00, "george bush", keeper)
-	eql(t, "issue115: top SDN 0", out[0].match, 0.667)
+	eql(t, "issue115: top SDN 0", out[0].match, 0.986)
 }
