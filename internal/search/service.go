@@ -3,28 +3,28 @@ package search
 import (
 	"context"
 	"fmt"
+	"os"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 
+	"github.com/moov-io/watchman/internal/indices"
 	"github.com/moov-io/watchman/internal/largest"
 	"github.com/moov-io/watchman/pkg/search"
 
 	"github.com/moov-io/base/log"
-	"go4.org/syncutil"
 )
 
 type Service interface {
-	Search(ctx context.Context, query search.Entity[search.Value], opts SearchOpts) ([]SearchedEntity[search.Value], error)
+	UpdateEntities(entities []search.Entity[search.Value])
+
+	Search(ctx context.Context, query search.Entity[search.Value], opts SearchOpts) ([]search.SearchedEntity[search.Value], error)
 }
 
-func NewService(logger log.Logger, entities []search.Entity[search.Value]) Service {
-	fmt.Printf("v2search NewService(%d entity types)\n", len(entities)) //nolint:forbidigo
-
-	gate := syncutil.NewGate(100) // TODO(adam):
-
+func NewService(logger log.Logger) Service {
 	return &service{
-		logger:   logger,
-		entities: entities,
-		Gate:     gate,
+		logger: logger,
 	}
 }
 
@@ -32,18 +32,20 @@ type service struct {
 	logger   log.Logger
 	entities []search.Entity[search.Value]
 
-	sync.RWMutex   // protects entities
-	*syncutil.Gate // limits concurrent processing
+	sync.RWMutex // protects entities
 }
 
-func (s *service) Search(ctx context.Context, query search.Entity[search.Value], opts SearchOpts) ([]SearchedEntity[search.Value], error) {
+func (s *service) UpdateEntities(entities []search.Entity[search.Value]) {
+	s.Lock()
+	defer s.Unlock()
+
+	s.entities = entities
+}
+
+func (s *service) Search(ctx context.Context, query search.Entity[search.Value], opts SearchOpts) ([]search.SearchedEntity[search.Value], error) {
 	// Grab a read-lock over our data
 	s.RLock()
 	defer s.RUnlock()
-
-	// Grab a worker slot
-	s.Gate.Start()
-	defer s.Gate.Done()
 
 	out, err := s.performSearch(ctx, query, opts)
 	if err != nil {
@@ -55,89 +57,67 @@ func (s *service) Search(ctx context.Context, query search.Entity[search.Value],
 type SearchOpts struct {
 	Limit    int
 	MinMatch float64
+
+	RequestID      string
+	DebugSourceIDs []string
 }
 
-func (s *service) performSearch(ctx context.Context, query search.Entity[search.Value], opts SearchOpts) ([]SearchedEntity[search.Value], error) {
+func (s *service) performSearch(ctx context.Context, query search.Entity[search.Value], opts SearchOpts) ([]search.SearchedEntity[search.Value], error) {
 	items := largest.NewItems(opts.Limit, opts.MinMatch)
 
-	indices := makeIndices(len(s.entities), opts.Limit/3) // limit goroutines
+	indices.ProcessSliceFn(s.entities, getGroupCount(opts), func(index search.Entity[search.Value]) {
+		score := search.DebugSimilarity(nil, query, index) // TODO(adam): add proper debug functionality?
 
-	var wg sync.WaitGroup
-	wg.Add(len(indices))
-
-	for idx := range indices {
-		start := idx
-		var end int
-
-		// We don't have another group
-		if start+1 >= len(indices) {
-			end = len(s.entities)
-		} else {
-			end = indices[start+1]
+		if slices.Contains(opts.DebugSourceIDs, index.SourceID) {
+			// fmt.Printf("%#v\n", index)
+			// fmt.Println("")
+			// fmt.Printf("%#v\n", index.SourceData)
+			// fmt.Println("")
+			// fmt.Printf("%#v\n", index.Business)
 		}
 
-		go func() {
-			defer wg.Done()
-
-			performSubSearch(items, query, s.entities[indices[start]:end])
-		}()
-	}
-	wg.Wait()
+		items.Add(largest.Item{
+			Value:  index,
+			Weight: score,
+		})
+	})
 
 	results := items.Items()
-	var out []SearchedEntity[search.Value]
+	var out []search.SearchedEntity[search.Value]
+	// fmt.Printf("results=%d ", len(results))
 
-	for _, entity := range results {
-		if entity == nil || entity.Value == nil {
+	for _, res := range results {
+		if res.Value.SourceID == "" || res.Weight <= 0.001 {
 			continue
 		}
 
-		if entity.Weight <= 0.001 {
-			continue
-		}
+		// fmt.Printf("res: %#v\n", res)
 
-		out = append(out, SearchedEntity[search.Value]{
-			Entity: entity.Value.(search.Entity[search.Value]),
-			Match:  entity.Weight,
+		// fmt.Println("append")
+		out = append(out, search.SearchedEntity[search.Value]{
+			Entity: res.Value,
+			Match:  res.Weight,
 		})
 	}
+	// fmt.Printf("out: %d\n", len(out))
+
+	// fmt.Printf("result mapping took: %v\n", time.Since(start))
 
 	return out, nil
 }
 
-func performSubSearch(items *largest.Items, query search.Entity[search.Value], entities []search.Entity[search.Value]) {
-	for _, entity := range entities {
-		score := search.DebugSimilarity(nil, query, entity)
+const (
+	defaultGroupCount = 20 // rough estimate from local testing // TODO(adam): more benchmarks
+)
 
-		if entity.Name == "HYDRA MARKET" {
-			fmt.Printf("%#v\n", entity)
-			fmt.Println("")
-			fmt.Printf("%#v\n", entity.SourceData)
-			fmt.Println("")
-			fmt.Printf("%#v\n", entity.Business)
+func getGroupCount(opts SearchOpts) int {
+	fromEnv := strings.TrimSpace(os.Getenv("SEARCH_GROUP_COUNT")) // not exported, used for initial testing
+	if fromEnv != "" {
+		n, err := strconv.ParseUint(fromEnv, 10, 8)
+		if err != nil {
+			panic(fmt.Sprintf("ERROR: parsing SEARCH_GROUP_COUNT=%q failed: %v", fromEnv, err)) //nolint:forbidigo
 		}
-
-		items.Add(&largest.Item{
-			Value:  entity,
-			Weight: score,
-		})
+		return int(n)
 	}
-}
-
-func makeIndices(total, groups int) []int {
-	if groups == 1 || groups >= total {
-		return []int{total}
-	}
-	xs := []int{0}
-	i := 0
-	for {
-		if i > total {
-			break
-		}
-		i += total / groups
-		if i < total {
-			xs = append(xs, i)
-		}
-	}
-	return append(xs, total)
+	return defaultGroupCount
 }

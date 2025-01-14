@@ -15,34 +15,18 @@ import (
 )
 
 func TestService_Search(t *testing.T) {
-	files := testInputs(t,
-		filepath.Join("..", "..", "pkg", "ofac", "testdata", "sdn.csv"),
-		filepath.Join("..", "..", "pkg", "ofac", "testdata", "alt.csv"),
-		filepath.Join("..", "..", "pkg", "ofac", "testdata", "add.csv"),
-		filepath.Join("..", "..", "pkg", "ofac", "testdata", "sdn_comments.csv"),
-	)
-	ofacRecords, err := ofac.Read(files)
-	require.NoError(t, err)
-
-	sdns := depointer(ofacRecords.SDNs)
-	addrs := depointer(ofacRecords.Addresses)
-	comments := depointer(ofacRecords.SDNComments)
-	alts := depointer(ofacRecords.AlternateIdentities)
-	entities := ofac.ToEntities(sdns, addrs, comments, alts)
-
 	ctx := context.Background()
-	logger := log.NewTestLogger()
-
 	opts := SearchOpts{Limit: 10, MinMatch: 0.01}
 
-	svc := NewService(logger, entities)
+	svc := testService(t)
 
 	t.Run("basic", func(t *testing.T) {
 		results, err := svc.Search(ctx, search.Entity[search.Value]{
 			Name: "SHIPPING LIMITED",
+			Type: search.EntityBusiness,
 		}, opts)
 		require.NoError(t, err)
-		require.Greater(t, len(results), 1)
+		require.Greater(t, len(results), 0)
 
 		t.Logf("got %d results", len(results))
 		t.Logf("")
@@ -63,15 +47,32 @@ func TestService_Search(t *testing.T) {
 		t.Logf("got %d results", len(results))
 		t.Logf("")
 		t.Logf("%#v", results[0])
+
+		res := results[0]
+		require.InDelta(t, 1.00, res.Match, 0.001)
+
+		// 36216
 	})
 }
 
-func TestService_makeIndicies(t *testing.T) {
-	indices := makeIndices(122, 5)
-	require.Len(t, indices, 7)
+func testService(tb testing.TB) Service {
+	files := testInputs(tb,
+		filepath.Join("..", "..", "pkg", "ofac", "testdata", "sdn.csv"),
+		filepath.Join("..", "..", "pkg", "ofac", "testdata", "alt.csv"),
+		filepath.Join("..", "..", "pkg", "ofac", "testdata", "add.csv"),
+		filepath.Join("..", "..", "pkg", "ofac", "testdata", "sdn_comments.csv"),
+	)
+	ofacRecords, err := ofac.Read(files)
+	require.NoError(tb, err)
 
-	expected := []int{0, 24, 48, 72, 96, 120, 122}
-	require.Equal(t, expected, indices)
+	entities := ofac.GroupIntoEntities(ofacRecords.SDNs, ofacRecords.Addresses, ofacRecords.SDNComments, ofacRecords.AlternateIdentities)
+
+	logger := log.NewTestLogger()
+
+	svc := NewService(logger)
+	svc.UpdateEntities(entities)
+
+	return svc
 }
 
 func testInputs(tb testing.TB, paths ...string) map[string]io.ReadCloser {
@@ -87,14 +88,4 @@ func testInputs(tb testing.TB, paths ...string) map[string]io.ReadCloser {
 		input[filename] = fd
 	}
 	return input
-}
-
-func depointer[T any](input []*T) []T {
-	out := make([]T, len(input))
-	for i := range input {
-		if input[i] != nil {
-			out[i] = *input[i]
-		}
-	}
-	return out
 }

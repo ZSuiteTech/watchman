@@ -8,14 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moov-io/base/log"
 	"github.com/moov-io/watchman/pkg/address"
 	"github.com/moov-io/watchman/pkg/search"
 
 	"github.com/gorilla/mux"
+	"github.com/moov-io/base/log"
+	"github.com/moov-io/base/strx"
 )
-
-// GET /v2/search
 
 type Controller interface {
 	AppendRoutes(router *mux.Router) *mux.Router
@@ -44,7 +43,7 @@ func (c *controller) AppendRoutes(router *mux.Router) *mux.Router {
 }
 
 type searchResponse struct {
-	Entities []SearchedEntity[search.Value] `json:"entities"`
+	Entities []search.SearchedEntity[search.Value] `json:"entities"`
 }
 
 type errorResponse struct {
@@ -52,6 +51,8 @@ type errorResponse struct {
 }
 
 func (c *controller) search(w http.ResponseWriter, r *http.Request) {
+	debug := strx.Yes(r.URL.Query().Get("debug"))
+
 	req, err := readSearchRequest(r)
 	if err != nil {
 		err = fmt.Errorf("problem reading v2 search request: %w", err)
@@ -65,10 +66,19 @@ func (c *controller) search(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
+	if debug {
+		c.logger.Debug().Logf("request: %#v", req)
+	}
 
+	q := r.URL.Query()
 	opts := SearchOpts{
-		Limit:    extractSearchLimit(r),
-		MinMatch: extractSearchMinMatch(r),
+		Limit:          extractSearchLimit(r),
+		MinMatch:       extractSearchMinMatch(r),
+		RequestID:      q.Get("requestID"),
+		DebugSourceIDs: strings.Split(q.Get("debugSourceIDs"), ","),
+	}
+	if debug {
+		c.logger.Debug().Logf("opts: %#v", opts)
 	}
 
 	entities, err := c.service.Search(r.Context(), req, opts)
@@ -77,6 +87,9 @@ func (c *controller) search(w http.ResponseWriter, r *http.Request) {
 
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+	if debug {
+		c.logger.Debug().Logf("found %d entities\n", len(entities))
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -120,7 +133,6 @@ func readSearchRequest(r *http.Request) (search.Entity[search.Value], error) {
 	req.Name = strings.TrimSpace(q.Get("name"))
 	req.Type = search.EntityType(strings.TrimSpace(strings.ToLower(q.Get("type"))))
 	req.Source = search.SourceAPIRequest
-	req.SourceID = strings.TrimSpace(q.Get("requestID"))
 
 	switch req.Type {
 	case search.EntityPerson:
